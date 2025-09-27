@@ -1,7 +1,7 @@
 Steps to handle git.
 
 1. Main branch will always have up to date working code.
-2. Always pull from main before starting working on a new feature/epic/story/task.
+2. Always pull from main before you start working on a new feature/epic/story/task.
 3. After pulling make a branch such as feature/SignIn, bugfix/Alerts etc....
 4. start pushing code on your branch after making progress.
 5. Once you are done, then contact others or let them know before merging.
