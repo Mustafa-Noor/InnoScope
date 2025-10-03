@@ -18,32 +18,40 @@ export default function Testimonials() {
   ];
 
   return (
-    <section className="section-padding bg-light">
+    <section className="section-padding" style={{ backgroundColor: 'white' }}>
       <div className="container">
         <div className="text-center mb-5">
-          <h2 className="display-5 fw-bold mb-3">What Our Customers Say</h2>
-          <p className="lead text-muted">Trusted by thousands of businesses worldwide</p>
+          <h2 className="display-5 fw-bold mb-3" style={{ fontFamily: 'Poppins, sans-serif' }}>What Our Customers Say</h2>
+          <p className="lead text-muted" style={{ fontFamily: 'Poppins, sans-serif' }}>Trusted by thousands of businesses worldwide</p>
         </div>
 
         <div className="row g-4">
           {testimonials.map((testimonial, index) => (
             <div key={index} className="col-lg-4 col-md-6">
-              <div className="card h-100 border-0 shadow-sm">
-                <div className="card-body p-4">
-                  <div className="mb-3">
-                    <div className="text-warning">
-                      {'★'.repeat(5)}
-                    </div>
+              <div className="h-100 p-4" style={{
+                backgroundColor: 'white',
+                border: '2px solid rgba(16, 185, 129, 0.1)',
+                borderRadius: '20px',
+                boxShadow: '0 4px 20px rgba(16, 185, 129, 0.05)'
+              }}>
+                <div className="mb-3">
+                  <div style={{ color: '#f59e0b' }}>
+                    {'★'.repeat(5)}
                   </div>
-                  <p className="card-text text-muted mb-4">"{testimonial.content}"</p>
-                  <div className="d-flex align-items-center">
-                    <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: '50px', height: '50px'}}>
-                      <span className="text-white fw-bold">{testimonial.name.charAt(0)}</span>
-                    </div>
-                    <div>
-                      <h6 className="mb-0 fw-bold">{testimonial.name}</h6>
-                      <small className="text-muted">{testimonial.role}</small>
-                    </div>
+                </div>
+                <p className="text-muted mb-4" style={{ fontFamily: 'Poppins, sans-serif' }}>"{testimonial.content}"</p>
+                <div className="d-flex align-items-center">
+                  <div className="rounded-circle d-flex align-items-center justify-content-center me-3" style={{
+                    width: '50px', 
+                    height: '50px',
+                    backgroundColor: '#059669',
+                    borderRadius: '15px'
+                  }}>
+                    <span className="text-white fw-bold" style={{ fontFamily: 'Poppins, sans-serif' }}>{testimonial.name.charAt(0)}</span>
+                  </div>
+                  <div>
+                    <h6 className="mb-0 fw-bold" style={{ fontFamily: 'Poppins, sans-serif' }}>{testimonial.name}</h6>
+                    <small className="text-muted" style={{ fontFamily: 'Poppins, sans-serif' }}>{testimonial.role}</small>
                   </div>
                 </div>
               </div>
