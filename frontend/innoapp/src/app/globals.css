@@ -1,0 +1,174 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  background-color: #ffffff !important;
+  font-family: 'Poppins', system-ui, sans-serif;
+  line-height: 1.6;
+}
+
+.hero-section {
+  position: relative;
+  background: #ffffff;
+  color: #1a1a1a;
+  padding: 80px 0 60px 0;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* Subtle emerald dotted background pattern on white */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(16, 185, 129, 0.06) 1px, transparent 1px),
+    radial-gradient(circle at 80% 70%, rgba(5, 150, 105, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 40% 80%, rgba(52, 211, 153, 0.03) 0.5px, transparent 0.5px);
+  background-size: 60px 60px, 100px 100px, 40px 40px;
+  background-position: 0 0, 30px 30px, 15px 15px;
+  animation: subtleFloat 25s ease-in-out infinite;
+  z-index: 1;
+}
+
+/* Subtle floating animation */
+@keyframes subtleFloat {
+  0%, 100% { transform: translateY(0px) translateX(0px); }
+  25% { transform: translateY(-3px) translateX(2px); }
+  50% { transform: translateY(-1px) translateX(-2px); }
+  75% { transform: translateY(-4px) translateX(3px); }
+}
+
+/* Soft emerald painted effect */
+.hero-section::after {
+  content: '';
+  position: absolute;
+  top: 5%;
+  right: 5%;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.02) 0%, transparent 60%);
+  border-radius: 50%;
+  animation: softPulse 6s ease-in-out infinite;
+  z-index: 1;
+}
+
+@keyframes softPulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.2); opacity: 0.6; }
+}
+
+/* Content positioning */
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+/* Elicit-style button hover effects with emerald theme */
+.hero-section .btn {
+  transition: all 0.2s ease;
+  text-decoration: none !important;
+  position: relative;
+  z-index: 2;
+}
+
+.hero-section .btn:hover {
+  transform: translateY(-1px);
+  text-decoration: none !important;
+}
+
+.hero-section .btn[style*="#059669"]:hover {
+  background-color: #047857 !important;
+  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+}
+
+.hero-section .btn[style*="border"]:hover {
+  background-color: rgba(16, 185, 129, 0.05) !important;
+  border-color: rgba(16, 185, 129, 0.5) !important;
+}
+
+/* Clean input styles with emerald focus */
+.hero-section .form-control:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+/* Content positioning for layered effect */
+.hero-section .container {
+  position: relative;
+  z-index: 2;
+}
+
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.pricing-card {
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.pricing-card:hover {
+  border-color: #667eea;
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(102, 126, 234, 0.15);
+}
+
+.pricing-card.featured {
+  border-color: #667eea;
+  transform: scale(1.05);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  padding: 12px 30px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+
+.section-padding {
+  padding: 80px 0;
+  background-color: #ffffff !important;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Ensure all sections have white background */
+section {
+  background-color: #ffffff !important;
+}
+
+.bg-light {
+  background-color: #ffffff !important;
+}
