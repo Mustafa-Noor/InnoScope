@@ -1,2 +1,7 @@
 fastapi
 uvicorn
+pydantic
+dotenv
+tavily-python
+google-generativeai
+langgraph
