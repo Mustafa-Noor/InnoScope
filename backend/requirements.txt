@@ -5,3 +5,6 @@ dotenv
 tavily-python
 google-generativeai
 langgraph
+python-docx 
+PyMuPDF
+python-multipart
