@@ -13,17 +13,139 @@ export default function RoadmapPage() {
     const selectedFiles = Array.from(event.target.files);
     
     if (selectedFiles.length > 0) {
-      setSelectedFolder('Selected Files');
-      setFiles(selectedFiles);
+      const firstFile = selectedFiles[0];
+      setSelectedFolder(firstFile.name);
       
-      // Filter to show only relevant file types (document/report files)
+      // Filter to show only PDF and DOCX files (supported by backend)
       const relevantFiles = selectedFiles.filter(file => {
         const extension = file.name.toLowerCase().split('.').pop();
-        return ['pdf', 'docx', 'doc', 'pptx', 'ppt', 'txt', 'md', 'rtf', 'odt', 'xlsx', 'xls'].includes(extension);
+        return ['pdf', 'docx'].includes(extension);
       });
+      
+      if (relevantFiles.length === 0) {
+        alert('Please select a PDF or DOCX file.');
+        return;
+      }
       
       setFiles(relevantFiles);
     }
+  };
+
+  // Parse roadmap text into structured phases
+  const parseRoadmapText = (roadmapText) => {
+    const phases = [];
+    const lines = roadmapText.split('\n').filter(line => line.trim());
+    
+    let currentPhase = null;
+    let phaseCounter = 1;
+    let currentObjective = '';
+    
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      
+      // Check for main numbered sections (1. Prototype Development, 2. Testing & Validation, etc.)
+      const mainSectionMatch = trimmedLine.match(/^### (\d+)\.\s*(.+)$/);
+      if (mainSectionMatch) {
+        // Save previous phase if exists
+        if (currentPhase) {
+          phases.push(currentPhase);
+        }
+        
+        // Start new phase
+        const phaseName = mainSectionMatch[2];
+        currentPhase = {
+          id: phaseCounter++,
+          name: phaseName,
+          duration: 'To be determined',
+          tasks: [],
+          objective: ''
+        };
+        currentObjective = '';
+        return;
+      }
+      
+      // Check for objectives
+      if (trimmedLine.startsWith('**Objective:**')) {
+        const objective = trimmedLine.replace('**Objective:**', '').trim();
+        if (currentPhase) {
+          currentPhase.objective = objective;
+          currentObjective = objective;
+        }
+        return;
+      }
+      
+      // Check for action items with specific format (Action 1a, Action 2b, etc.)
+      const actionMatch = trimmedLine.match(/^\*\s+\*Action \d+[a-z]:\*\s*(.+)$/);
+      if (actionMatch && currentPhase) {
+        const actionDescription = actionMatch[1];
+        currentPhase.tasks.push(actionDescription);
+        return;
+      }
+      
+      // Check for general bullet points with actions
+      const bulletMatch = trimmedLine.match(/^\*\s+(.+)$/);
+      if (bulletMatch && currentPhase && !trimmedLine.includes('Action')) {
+        const task = bulletMatch[1];
+        // Only add meaningful tasks (longer than 15 characters and not just formatting)
+        if (task.length > 15 && !task.match(/^(Objective|Goal|Target):/)) {
+          currentPhase.tasks.push(task);
+        }
+        return;
+      }
+      
+      // Check for sub-bullet points (nested actions)
+      const subBulletMatch = trimmedLine.match(/^\s+\*\s+\*(.+?):\*\s*(.+)$/);
+      if (subBulletMatch && currentPhase) {
+        const actionTitle = subBulletMatch[1];
+        const actionDesc = subBulletMatch[2];
+        currentPhase.tasks.push(`${actionTitle}: ${actionDesc}`);
+        return;
+      }
+      
+      // Fallback: check for any meaningful content that might be a task
+      if (currentPhase && trimmedLine.length > 20 && 
+          !trimmedLine.startsWith('**') && 
+          !trimmedLine.startsWith('---') &&
+          !trimmedLine.startsWith('#') &&
+          !trimmedLine.match(/^(As an expert|This roadmap|Objective)/)) {
+        
+        // Clean up the task text
+        let cleanTask = trimmedLine.replace(/^\*+\s*/, '').replace(/\*\*/g, '');
+        if (cleanTask.length > 15) {
+          currentPhase.tasks.push(cleanTask);
+        }
+      }
+    });
+    
+    // Add the last phase
+    if (currentPhase) {
+      phases.push(currentPhase);
+    }
+    
+    // If no phases were found with the specific format, try a simpler approach
+    if (phases.length === 0) {
+      const simpleSections = roadmapText.split(/\n\n###?\s*\d+\.?\s*/);
+      simpleSections.forEach((section, index) => {
+        if (section.trim() && index > 0) {
+          const lines = section.split('\n').filter(line => line.trim());
+          if (lines.length > 0) {
+            const title = lines[0].trim().replace(/\*+/g, '').replace(/#+/g, '');
+            const tasks = lines.slice(1).filter(line => line.trim().length > 15).map(line => 
+              line.trim().replace(/^\*+\s*/, '').replace(/\*\*/g, '')
+            );
+            
+            phases.push({
+              id: index,
+              name: title || `Phase ${index}`,
+              duration: 'To be determined',
+              tasks: tasks.slice(0, 8) // Limit to 8 tasks per phase for UI
+            });
+          }
+        }
+      });
+    }
+    
+    return phases;
   };
 
   // Handle generate roadmap
@@ -33,47 +155,101 @@ export default function RoadmapPage() {
       return;
     }
 
+    // Only process the first file for now (can be extended later)
+    const firstFile = files[0];
+    
+    // Check if it's a supported file type
+    const supportedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!supportedTypes.includes(firstFile.type) && !firstFile.name.toLowerCase().endsWith('.pdf') && !firstFile.name.toLowerCase().endsWith('.docx')) {
+      alert('Please select a PDF or DOCX file for roadmap generation.');
+      return;
+    }
+
     setIsGenerating(true);
     
     try {
-      // Simulate roadmap generation (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', firstFile);
       
-      // Mock roadmap data
-      const mockRoadmap = {
-        projectName: selectedFolder,
-        phases: [
-          {
-            id: 1,
-            name: 'Project Setup & Planning',
-            duration: '1-2 weeks',
-            tasks: ['Environment setup', 'Dependencies installation', 'Project structure analysis']
-          },
-          {
-            id: 2,
-            name: 'Core Development',
-            duration: '4-6 weeks',
-            tasks: ['Implement core features', 'Database integration', 'API development']
-          },
-          {
-            id: 3,
-            name: 'Testing & Optimization',
-            duration: '2-3 weeks',
-            tasks: ['Unit testing', 'Integration testing', 'Performance optimization']
-          },
-          {
-            id: 4,
-            name: 'Deployment & Documentation',
-            duration: '1-2 weeks',
-            tasks: ['Production deployment', 'Documentation', 'User guide creation']
-          }
-        ]
+      // Call backend API
+      const response = await fetch('http://localhost:8000/roadmap/generate', {
+        method: 'POST',
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        alert(result.message || 'Failed to generate roadmap');
+        return;
+      }
+      
+      // Parse the roadmap text into structured phases
+      const parsedPhases = parseRoadmapText(result.roadmap);
+      
+      // Add estimated durations based on phase content
+      parsedPhases.forEach((phase, index) => {
+        // Estimate duration based on phase type and complexity
+        const taskCount = phase.tasks.length;
+        const phaseName = phase.name.toLowerCase();
+        
+        if (phaseName.includes('prototype') || phaseName.includes('development')) {
+          phase.duration = taskCount > 5 ? '6-8 weeks' : '4-6 weeks';
+        } else if (phaseName.includes('testing') || phaseName.includes('validation')) {
+          phase.duration = taskCount > 4 ? '4-6 weeks' : '2-4 weeks';
+        } else if (phaseName.includes('funding') || phaseName.includes('grant')) {
+          phase.duration = '3-6 months';
+        } else if (phaseName.includes('manufacturing') || phaseName.includes('implementation')) {
+          phase.duration = '8-12 weeks';
+        } else if (phaseName.includes('marketing') || phaseName.includes('promotion')) {
+          phase.duration = '6-10 weeks';
+        } else if (phaseName.includes('launch') || phaseName.includes('deployment')) {
+          phase.duration = '4-8 weeks';
+        } else if (phaseName.includes('maintenance') || phaseName.includes('iteration')) {
+          phase.duration = 'Ongoing';
+        } else if (phaseName.includes('scaling') || phaseName.includes('expansion')) {
+          phase.duration = '6-12 months';
+        } else {
+          // Default estimation based on task complexity
+          phase.duration = taskCount > 6 ? '6-10 weeks' : taskCount > 3 ? '3-6 weeks' : '2-4 weeks';
+        }
+      });
+      
+      // If no phases were parsed, create a fallback
+      if (parsedPhases.length === 0) {
+        parsedPhases.push({
+          id: 1,
+          name: 'Research Implementation',
+          duration: 'To be determined',
+          tasks: ['Review the generated roadmap text', 'Plan implementation strategy', 'Begin development'],
+          objective: 'Transform research findings into actionable implementation plan'
+        });
+      }
+      
+      const roadmapData = {
+        projectName: firstFile.name.replace(/\.[^/.]+$/, ''), // Remove file extension
+        phases: parsedPhases,
+        summary: result.summary
       };
       
-      setRoadmapData(mockRoadmap);
+      setRoadmapData(roadmapData);
+      
     } catch (error) {
       console.error('Error generating roadmap:', error);
-      alert('Error generating roadmap. Please try again.');
+      
+      // Show more specific error messages
+      if (error.message.includes('Failed to fetch')) {
+        alert('Cannot connect to the backend server. Please ensure the backend is running on http://localhost:8000');
+      } else if (error.message.includes('HTTP error')) {
+        alert(`Server error: ${error.message}. Please check the file format and try again.`);
+      } else {
+        alert('Error generating roadmap. Please try again.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -117,7 +293,7 @@ export default function RoadmapPage() {
             color: '#6b7280',
             fontFamily: 'Poppins, sans-serif'
           }}>
-            Upload your project folder to generate an intelligent development roadmap
+            Upload a research paper to generate an intelligent implementation roadmap
           </p>
         </div>
 
@@ -159,14 +335,13 @@ export default function RoadmapPage() {
               marginBottom: '24px',
               fontFamily: 'Poppins, sans-serif'
             }}>
-              Choose PDF, DOCX, or other document files for your project
+              Choose a research paper (PDF or DOCX) to generate an implementation roadmap
             </p>
             
             <input
               ref={folderInputRef}
               type="file"
-              accept=".pdf,.docx,.doc,.pptx,.ppt,.txt,.md,.rtf,.odt,.xlsx,.xls"
-              multiple
+              accept=".pdf,.docx"
               onChange={handleFolderSelect}
               style={{ display: 'none' }}
               id="file-upload"
@@ -302,7 +477,7 @@ export default function RoadmapPage() {
               </>
             ) : (
               <>
-                Generate Roadmap
+                Generate Implementation Roadmap
               </>
             )}
           </button>
@@ -354,8 +529,37 @@ export default function RoadmapPage() {
               fontFamily: 'Poppins, sans-serif',
               textAlign: 'center'
             }}>
-              Development Roadmap for {roadmapData.projectName}
+              Implementation Roadmap for {roadmapData.projectName}
             </h2>
+
+            {/* Research Summary */}
+            {roadmapData.summary && (
+              <div style={{
+                backgroundColor: '#f0f9ff',
+                border: '1px solid #0ea5e9',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '30px'
+              }}>
+                <h3 style={{
+                  fontSize: '1.2rem',
+                  fontWeight: '600',
+                  color: '#0c4a6e',
+                  marginBottom: '12px',
+                  fontFamily: 'Poppins, sans-serif'
+                }}>
+                  Research Summary
+                </h3>
+                <p style={{
+                  fontSize: '0.95rem',
+                  color: '#1e40af',
+                  lineHeight: '1.6',
+                  fontFamily: 'Poppins, sans-serif'
+                }}>
+                  {roadmapData.summary}
+                </p>
+              </div>
+            )}
 
             {/* Roadmap with Arrows */}
             <div style={{ 
@@ -605,6 +809,34 @@ export default function RoadmapPage() {
                           </h5>
                         </div>
 
+                        {/* Objective Section */}
+                        {phase.objective && (
+                          <div style={{ marginBottom: '20px' }}>
+                            <h6 style={{
+                              fontSize: '1rem',
+                              fontWeight: '600',
+                              color: '#374151',
+                              marginBottom: '10px',
+                              fontFamily: 'Poppins, sans-serif'
+                            }}>
+                              Objective:
+                            </h6>
+                            <p style={{
+                              fontSize: '0.85rem',
+                              color: '#6b7280',
+                              lineHeight: '1.5',
+                              fontFamily: 'Poppins, sans-serif',
+                              fontStyle: 'italic',
+                              padding: '10px',
+                              backgroundColor: '#f9fafb',
+                              borderRadius: '8px',
+                              border: `1px solid ${phaseColors[index]}20`
+                            }}>
+                              {phase.objective}
+                            </p>
+                          </div>
+                        )}
+
                         {/* Tasks List */}
                         <div style={{ marginBottom: '20px' }}>
                           <h6 style={{
@@ -694,79 +926,79 @@ export default function RoadmapPage() {
                   );
                 })}
 
-                {/* Arrows Between Cards */}
-                {/* Mini Timeline */}
-                <div 
-                  className="mini-timeline"
-                  style={{
-                    position: 'absolute',
-                    top: '450px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    zIndex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    background: 'rgba(255, 255, 255, 0.9)',
-                    padding: '12px 20px',
-                    borderRadius: '25px',
-                    boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)'
-                  }}
-                >
-                  {roadmapData.phases.map((phase, index) => {
-                    const phaseColors = ['#059669', '#0891b2', '#7c3aed', '#dc2626'];
+
+              </div>
+            </div>
+
+            {/* Mini Timeline - Positioned at the bottom */}
+            <div 
+              className="mini-timeline"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                background: 'rgba(255, 255, 255, 0.9)',
+                padding: '16px 24px',
+                borderRadius: '25px',
+                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.1)',
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                marginTop: '30px',
+                maxWidth: 'fit-content',
+                margin: '30px auto 0'
+              }}
+            >
+              {roadmapData.phases.map((phase, index) => {
+                const phaseColors = ['#059669', '#0891b2', '#7c3aed', '#dc2626', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
+                
+                return (
+                  <React.Fragment key={`timeline-${index}`}>
+                    {/* Timeline Dot */}
+                    <div
+                      className={`timeline-dot dot-${index}`}
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        backgroundColor: phaseColors[index % phaseColors.length],
+                        border: '3px solid white',
+                        boxShadow: `0 2px 10px ${phaseColors[index % phaseColors.length]}50`,
+                        animation: `timelinePulse 2s ease-in-out infinite ${index * 0.3}s`,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease'
+                      }}
+                      title={`Phase ${index + 1}: ${phase.name}`}
+                    />
                     
-                    return (
-                      <React.Fragment key={`timeline-${index}`}>
-                        {/* Timeline Dot */}
-                        <div
-                          className={`timeline-dot dot-${index}`}
-                          style={{
-                            width: '12px',
-                            height: '12px',
-                            borderRadius: '50%',
-                            backgroundColor: phaseColors[index],
-                            border: '2px solid white',
-                            boxShadow: `0 2px 8px ${phaseColors[index]}40`,
-                            animation: `timelinePulse 2s ease-in-out infinite ${index * 0.3}s`,
-                            cursor: 'pointer',
-                            transition: 'all 0.3s ease'
-                          }}
-                          title={`Phase ${index + 1}: ${phase.name}`}
-                        />
-                        
-                        {/* Connection Line */}
-                        {index < roadmapData.phases.length - 1 && (
-                          <div
-                            style={{
-                              width: '24px',
-                              height: '2px',
-                              background: `linear-gradient(90deg, ${phaseColors[index]}, ${phaseColors[index + 1]})`,
-                              borderRadius: '1px',
-                              opacity: 0.6
-                            }}
-                          />
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                  
-                  {/* Progress Indicator */}
-                  <div
-                    className="progress-text"
-                    style={{
-                      marginLeft: '12px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      color: '#6b7280',
-                      fontFamily: 'Poppins, sans-serif'
-                    }}
-                  >
-                    {roadmapData.phases.length} Phase{roadmapData.phases.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
+                    {/* Connection Line */}
+                    {index < roadmapData.phases.length - 1 && (
+                      <div
+                        style={{
+                          width: '32px',
+                          height: '3px',
+                          background: `linear-gradient(90deg, ${phaseColors[index % phaseColors.length]}, ${phaseColors[(index + 1) % phaseColors.length]})`,
+                          borderRadius: '2px',
+                          opacity: 0.7
+                        }}
+                      />
+                    )}
+                  </React.Fragment>
+                );
+              })}
+              
+              {/* Progress Indicator */}
+              <div
+                className="progress-text"
+                style={{
+                  marginLeft: '16px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: '#6b7280',
+                  fontFamily: 'Poppins, sans-serif'
+                }}
+              >
+                {roadmapData.phases.length} Phase{roadmapData.phases.length !== 1 ? 's' : ''} Complete
               </div>
             </div>
           </div>
@@ -886,24 +1118,24 @@ export default function RoadmapPage() {
         }
         
         .mini-timeline:hover {
-          transform: translateX(-50%) translateY(-2px);
+          transform: translateY(-2px);
           box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
         }
 
         /* Responsive Timeline */
         @media (max-width: 999px) and (min-width: 600px) {
           [class*="phase-card-"] {
-            margin-bottom: 50px;
+            margin-bottom: 30px;
           }
 
           .mini-timeline {
-            top: 220px;
-            padding: 10px 16px;
+            padding: 12px 20px;
+            margin-top: 25px;
           }
 
           .timeline-dot {
-            width: 10px;
-            height: 10px;
+            width: 12px;
+            height: 12px;
           }
         }
 
@@ -911,23 +1143,23 @@ export default function RoadmapPage() {
         @media (max-width: 599px) {
           [class*="phase-card-"] {
             width: 280px;
-            margin-bottom: 60px;
+            margin-bottom: 40px;
           }
 
           .mini-timeline {
-            top: 230px;
-            padding: 8px 14px;
+            padding: 10px 16px;
             gap: 6px;
+            margin-top: 20px;
           }
 
           .timeline-dot {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
           }
 
           .progress-text {
-            font-size: 10px;
-            margin-left: 8px;
+            font-size: 11px;
+            margin-left: 10px;
           }
 
           .detail-card {
