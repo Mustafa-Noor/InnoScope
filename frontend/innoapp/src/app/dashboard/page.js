@@ -2,21 +2,29 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useEffect } from 'react';
 import Navbar from '../components/Navbar';
+import SideNav from '../components/SideNav';
+import ProtectedRoute from '../components/ProtectedRoute';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function DashboardPage() {
+  const { user } = useAuth();
+  
   useEffect(() => {
     import('bootstrap/dist/js/bootstrap.bundle.min.js');
   }, []);
 
   return (
-    <main>
-      <Navbar />
+    <ProtectedRoute requireAuth={true}>
+      <main>
+      
+      <SideNav />
+      {/* <Navbar /> */}
       <div style={{ paddingTop: '80px' }}>
         <div className="container-fluid">
           <div className="row">
             {/* Sidebar */}
             <div className="col-md-3 col-lg-2 bg-light min-vh-100 p-3">
-              <div className="d-flex flex-column">
+              {/* <div className="d-flex flex-column">
                 <h6 className="fw-bold text-muted mb-3">MENU</h6>
                 <ul className="nav nav-pills flex-column">
                   <li className="nav-item">
@@ -40,14 +48,21 @@ export default function DashboardPage() {
                     </a>
                   </li>
                 </ul>
-              </div>
+              </div> */}
             </div>
 
             {/* Main Content */}
             <div className="col-md-9 col-lg-10 p-4">
               <div className="d-flex justify-content-between align-items-center mb-4">
-                <h2 className="fw-bold">Dashboard</h2>
-                <button className="btn btn-primary">+ New Project</button>
+                <div>
+                  <h2 className="fw-bold">Dashboard</h2>
+                  {user && (
+                    <p className="text-muted mb-0">
+                      Welcome back, {user.firstName} {user.lastName}! 👋
+                    </p>
+                  )}
+                </div>
+                {/* <button className="btn btn-primary">+ New Project</button> */}
               </div>
 
               {/* Stats Cards */}
@@ -153,5 +168,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </main>
+    </ProtectedRoute>
   );
 }

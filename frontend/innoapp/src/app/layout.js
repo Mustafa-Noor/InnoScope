@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import SideNav from './components/SideNav';
+// SideNav intentionally removed from root layout so auth pages won't show the sidebar
+import { AuthProvider } from './contexts/AuthContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,18 +30,11 @@ export default function RootLayout({ children }) {
           padding: 0
         }}
       >
-        <div style={{ display: 'flex', minHeight: '100vh' }}>
-          <SideNav />
-          <main style={{ 
-            marginLeft: '240px', 
-            flex: 1,
-            backgroundColor: '#ffffff',
-            minHeight: '100vh',
-            padding: '20px'
-          }}>
-            {children}
-          </main>
-        </div>
+        <AuthProvider>
+          {/* Root layout no longer forces a sidebar/navbar so nested layouts/pages can decide
+              whether to render SideNav or Navbar (auth pages should be clean). */}
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
