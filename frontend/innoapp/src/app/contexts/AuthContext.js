@@ -6,15 +6,28 @@ const AuthContext = createContext({});
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
   useEffect(() => {
-    // Check if user is logged in (e.g., from localStorage or API call)
     const checkAuth = async () => {
       try {
-        // TODO: Replace with actual auth check
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          setUser(JSON.parse(userData));
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch(`${API_BASE}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data);
+        } else {
+          localStorage.removeItem('token'); // invalid token
         }
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -28,22 +41,28 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Logging in:', { email, password });
-      
-      // Simulate API response
-      const userData = {
-        id: 1,
-        email,
-        firstName: 'John',
-        lastName: 'Doe',
-        role: 'user'
-      };
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data?.detail || 'Login failed' };
+      }
+
+      // Store only token
+      localStorage.setItem('token', data.access_token);
+
+      // Fetch user data
+      const meRes = await fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${data.access_token}` },
+      });
+      const userData = await meRes.json();
       setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('token', 'mock-jwt-token');
-      
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -52,22 +71,25 @@ export function AuthProvider({ children }) {
 
   const signup = async (userData) => {
     try {
-      // TODO: Replace with actual API call
-      console.log('Signing up:', userData);
-      
-      // Simulate API response
-      const newUser = {
-        id: Date.now(),
+      const payload = {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
         email: userData.email,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        role: 'user'
+        password: userData.password,
       };
 
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
-      localStorage.setItem('token', 'mock-jwt-token');
-      
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        return { success: false, error: data?.detail || 'Registration failed' };
+      }
+
       return { success: true };
     } catch (error) {
       return { success: false, error: error.message };
@@ -76,22 +98,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('user');
     localStorage.removeItem('token');
-  };
-
-  const forgotPassword = async (email) => {
-    try {
-      // TODO: Replace with actual API call
-      console.log('Password reset requested for:', email);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
   };
 
   const value = {
@@ -100,8 +107,7 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    forgotPassword,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   };
 
   return (
