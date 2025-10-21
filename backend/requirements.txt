@@ -8,3 +8,9 @@ langgraph
 python-docx 
 PyMuPDF
 python-multipart
+
+sqlalchemy
+asyncpg
+pydantic[email]
+python-jose
+passlib[argon2]
