@@ -3,6 +3,7 @@
 import { useAuth } from './contexts/AuthContext'
 import SideNav from './components/SideNav'
 import LoginPage from './auth/login/page'
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 export default function Home() {
   const { user, loading } = useAuth()

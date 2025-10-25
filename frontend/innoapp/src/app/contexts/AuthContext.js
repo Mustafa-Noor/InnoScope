@@ -6,7 +6,7 @@ const AuthContext = createContext({});
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:8000';
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -88,6 +88,13 @@ export function AuthProvider({ children }) {
 
       if (!res.ok) {
         return { success: false, error: data?.detail || 'Registration failed' };
+      }
+
+      // After successful registration, automatically log the user in to obtain a token
+      const loginResult = await login(userData.email, userData.password);
+      if (!loginResult.success) {
+        // registration succeeded but automatic login failed; return partial success
+        return { success: false, error: loginResult.error || 'Registration succeeded but login failed' };
       }
 
       return { success: true };

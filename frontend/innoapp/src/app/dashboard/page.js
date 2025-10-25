@@ -1,173 +1,210 @@
-'use client';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import SideNav from '../components/SideNav';
-import ProtectedRoute from '../components/ProtectedRoute';
-import { useAuth } from '../contexts/AuthContext';
+"use client";
 
-export default function DashboardPage() {
-  const { user } = useAuth();
-  
+import React, { useEffect, useState } from "react";
+import { Line, Bar } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  LineElement,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import "bootstrap/dist/css/bootstrap.min.css";
+
+ChartJS.register(LineElement, BarElement, CategoryScale, LinearScale, PointElement, Tooltip, Legend);
+
+export default function Dashboard() {
+  const [user, setUser] = useState({ name: "Sumaira" });
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // 🌱 Dummy fallback data
+  const dummyData = {
+    collaborators: 8,
+    major_interest: "AI / ML",
+    reports_generated: 18,
+    daily_usage_minutes: [30, 60, 45, 80, 50, 40, 70],
+    projects_discussed: ["Solitaire", "WeatherApp", "TourGuide"],
+    project_hours: [4, 6, 8],
+  };
+
+  // 🌐 Fetch from FastAPI (fallbacks to dummy)
   useEffect(() => {
-    import('bootstrap/dist/js/bootstrap.bundle.min.js');
+    const token = localStorage.getItem("token");
+    if (!token) {
+      window.location.href = "/login";
+      return;
+    }
+
+    fetch("http://127.0.0.1:8000/api/dashboard", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Bad response");
+        return res.json();
+      })
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) setStats(data);
+        else setStats(dummyData);
+        setLoading(false);
+      })
+      .catch(() => {
+        setStats(dummyData);
+        setLoading(false);
+      });
   }, []);
 
+  // 🚪 Logout
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    sessionStorage.removeItem("token");
+    window.location.href = "/auth/login";
+  };
+
+  if (loading)
+    return (
+      <div className="d-flex justify-content-center align-items-center vh-100 bg-white">
+        <div className="spinner-border text-success" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    );
+
+  if (!stats)
+    return (
+      <div className="text-center mt-5 text-danger">No data available</div>
+    );
+
+  // 📈 Line chart data
+  const lineData = {
+    labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    datasets: [
+      {
+        label: "Daily Usage (min)",
+        data: stats.daily_usage_minutes,
+        borderColor: "#10b981",
+        backgroundColor: "rgba(16,185,129,0.15)",
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  };
+
+  // 📊 Bar chart data
+  const barData = {
+    labels: stats.projects_discussed,
+    datasets: [
+      {
+        label: "Hours Spent",
+        data: stats.project_hours,
+        backgroundColor: "#10b981",
+        borderRadius: 6,
+      },
+    ],
+  };
+
   return (
-    <ProtectedRoute requireAuth={true}>
-      <main>
-      
-      <SideNav />
-      {/* <Navbar /> */}
-      <div style={{ paddingTop: '80px' }}>
-        <div className="container-fluid">
-          <div className="row">
-            {/* Sidebar */}
-            <div className="col-md-3 col-lg-2 bg-light min-vh-100 p-3">
-              {/* <div className="d-flex flex-column">
-                <h6 className="fw-bold text-muted mb-3">MENU</h6>
-                <ul className="nav nav-pills flex-column">
-                  <li className="nav-item">
-                    <a className="nav-link active" href="#">
-                      📊 Dashboard
-                    </a>
-                  </li>
-                  <li className="nav-item">
-                    <a className="nav-link" href="#">
-                      📈 Analytics
-                    </a>
-                  </li>
-                  <li className="nav-item">
-                    <a className="nav-link" href="#">
-                      👥 Team
-                    </a>
-                  </li>
-                  <li className="nav-item">
-                    <a className="nav-link" href="#">
-                      ⚙️ Settings
-                    </a>
-                  </li>
-                </ul>
-              </div> */}
+    <div style={{ backgroundColor: "#f3f4f6", minHeight: "100vh", borderRadius: '10px', border: '1px solid #e5e7eb', padding: '10px' }}>
+      {/* Navbar */}
+      <div className="d-flex justify-content-between align-items-center px-4 py-3 bg-white shadow-sm">
+        <h2 className="fw-bold" style={{ color: "#065f46" }}>
+          Hi, {user.name} 👋
+        </h2>
+        <button
+          className="btn"
+          style={{
+            backgroundColor: "#10b981",
+            color: "white",
+            borderRadius: "10px",
+            padding: "6px 20px",
+          }}
+          onClick={handleLogout}
+        >
+          Logout
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="container py-4">
+        {/* Stats Cards */}
+        <div className="row g-4 mb-4">
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-sm text-center p-4"
+              style={{ backgroundColor: "white" }}
+            >
+              <h6 style={{ color: "#6b7280" }}>Collaborators</h6>
+              <h2 style={{ color: "#10b981", fontWeight: "700" }}>
+                {stats.collaborators}
+              </h2>
             </div>
-
-            {/* Main Content */}
-            <div className="col-md-9 col-lg-10 p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <div>
-                  <h2 className="fw-bold">Dashboard</h2>
-                  {user && (
-                    <p className="text-muted mb-0">
-                      Welcome back, {user.firstName} {user.lastName}! 👋
-                    </p>
-                  )}
-                </div>
-                {/* <button className="btn btn-primary">+ New Project</button> */}
-              </div>
-
-              {/* Stats Cards */}
-              <div className="row g-4 mb-4">
-                <div className="col-lg-3 col-md-6">
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between">
-                        <div>
-                          <h6 className="card-title text-muted">Total Users</h6>
-                          <h3 className="fw-bold">1,234</h3>
-                        </div>
-                        <div className="text-primary fs-2">👥</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-lg-3 col-md-6">
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between">
-                        <div>
-                          <h6 className="card-title text-muted">Revenue</h6>
-                          <h3 className="fw-bold">$45,678</h3>
-                        </div>
-                        <div className="text-success fs-2">💰</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-lg-3 col-md-6">
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between">
-                        <div>
-                          <h6 className="card-title text-muted">Projects</h6>
-                          <h3 className="fw-bold">89</h3>
-                        </div>
-                        <div className="text-warning fs-2">📁</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-lg-3 col-md-6">
-                  <div className="card">
-                    <div className="card-body">
-                      <div className="d-flex justify-content-between">
-                        <div>
-                          <h6 className="card-title text-muted">Tasks</h6>
-                          <h3 className="fw-bold">156</h3>
-                        </div>
-                        <div className="text-info fs-2">✅</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Charts Section */}
-              <div className="row g-4">
-                <div className="col-lg-8">
-                  <div className="card">
-                    <div className="card-header">
-                      <h5 className="card-title mb-0">Analytics Overview</h5>
-                    </div>
-                    <div className="card-body">
-                      <div className="bg-light rounded p-5 text-center">
-                        <div className="display-1 mb-3">📊</div>
-                        <h4>Chart Placeholder</h4>
-                        <p className="text-muted">Interactive charts would go here</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-lg-4">
-                  <div className="card">
-                    <div className="card-header">
-                      <h5 className="card-title mb-0">Recent Activity</h5>
-                    </div>
-                    <div className="card-body">
-                      <div className="d-flex align-items-center mb-3">
-                        <div className="bg-primary rounded-circle me-3" style={{width: '8px', height: '8px'}}></div>
-                        <small>New user registered</small>
-                      </div>
-                      <div className="d-flex align-items-center mb-3">
-                        <div className="bg-success rounded-circle me-3" style={{width: '8px', height: '8px'}}></div>
-                        <small>Payment received</small>
-                      </div>
-                      <div className="d-flex align-items-center mb-3">
-                        <div className="bg-warning rounded-circle me-3" style={{width: '8px', height: '8px'}}></div>
-                        <small>Task completed</small>
-                      </div>
-                      <div className="d-flex align-items-center mb-3">
-                        <div className="bg-info rounded-circle me-3" style={{width: '8px', height: '8px'}}></div>
-                        <small>New message</small>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          </div>
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-sm text-center p-4"
+              style={{ backgroundColor: "white" }}
+            >
+              <h6 style={{ color: "#6b7280" }}>Major Interest</h6>
+              <h5 style={{ color: "#065f46", fontWeight: "600" }}>
+                {stats.major_interest}
+              </h5>
+            </div>
+          </div>
+          <div className="col-md-4">
+            <div
+              className="card border-0 shadow-sm text-center p-4"
+              style={{ backgroundColor: "white" }}
+            >
+              <h6 style={{ color: "#6b7280" }}>Reports Generated</h6>
+              <h2 style={{ color: "#10b981", fontWeight: "700" }}>
+                {stats.reports_generated}
+              </h2>
             </div>
           </div>
         </div>
+
+        {/* Charts */}
+        <div className="row g-4">
+          <div className="col-md-6">
+            <div
+              className="card border-0 shadow-sm p-4"
+              style={{ backgroundColor: "white" }}
+            >
+              <h6 style={{ color: "#065f46" }}>Daily Usage</h6>
+              <Line data={lineData} />
+            </div>
+          </div>
+          <div className="col-md-6">
+            <div
+              className="card border-0 shadow-sm p-4"
+              style={{ backgroundColor: "white" }}
+            >
+              <h6 style={{ color: "#065f46" }}>Projects Discussed</h6>
+              <Bar data={barData} />
+            </div>
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div
+          className="card border-0 shadow-sm mt-4 p-4"
+          style={{ backgroundColor: "white" }}
+        >
+          <h6 style={{ color: "#065f46" }}>Weekly Summary</h6>
+          <p style={{ color: "#374151" }}>
+            You worked with <b>{stats.collaborators}</b> collaborators, generated{" "}
+            <b>{stats.reports_generated}</b> reports, and focused on{" "}
+            <b>{stats.major_interest}</b>. Keep going strong,{" "}
+            <span style={{ color: "#10b981", fontWeight: 600 }}>
+              {user.name}!
+            </span>{" "}
+            🚀
+          </p>
+        </div>
       </div>
-    </main>
-    </ProtectedRoute>
+    </div>
   );
 }
