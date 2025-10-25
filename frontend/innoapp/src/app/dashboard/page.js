@@ -1,7 +1,6 @@
 "use client";
-
-import React, { useEffect, useState } from "react";
 import { Line, Bar } from "react-chartjs-2";
+import React, { useEffect, useState } from "react";
 import {
   Chart as ChartJS,
   LineElement,
