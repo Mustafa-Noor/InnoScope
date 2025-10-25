@@ -1,6 +1,8 @@
 'use client';
 import React, { useState, useRef } from 'react'
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 export default function RoadmapPage() {
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [files, setFiles] = useState([]);
@@ -173,7 +175,7 @@ export default function RoadmapPage() {
       formData.append('file', firstFile);
       
       // Call backend API
-      const response = await fetch('http://localhost:8000/roadmap/generate', {
+      const response = await fetch(`${API_BASE}/roadmap/generate`, {
         method: 'POST',
         body: formData,
       });
