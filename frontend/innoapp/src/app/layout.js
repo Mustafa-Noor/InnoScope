@@ -1,7 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-// SideNav intentionally removed from root layout so auth pages won't show the sidebar
 import { AuthProvider } from './contexts/AuthContext';
+import AppShell from './components/AppShell';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,9 +31,10 @@ export default function RootLayout({ children }) {
         }}
       >
         <AuthProvider>
-          {/* Root layout no longer forces a sidebar/navbar so nested layouts/pages can decide
-              whether to render SideNav or Navbar (auth pages should be clean). */}
-          {children}
+          {/* AppShell decides whether to show SideNav (it hides on /auth routes) */}
+          <AppShell>
+            {children}
+          </AppShell>
         </AuthProvider>
       </body>
     </html>

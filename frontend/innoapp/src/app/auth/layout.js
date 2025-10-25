@@ -18,18 +18,17 @@ export const metadata = {
 
 export default function AuthLayout({ children }) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{ 
-          backgroundColor: '#ffffff', 
-          fontFamily: 'Poppins, sans-serif',
-          margin: 0,
-          padding: 0
-        }}
-      >
-        {children}
-      </body>
-    </html>
+    <div
+      className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      style={{
+        backgroundColor: '#ffffff',
+        fontFamily: 'Poppins, sans-serif',
+        margin: 0,
+        padding: 0,
+        minHeight: '100vh'
+      }}
+    >
+      {children}
+    </div>
   );
 }

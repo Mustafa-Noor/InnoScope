@@ -4,14 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const navItems = [
-    { name: 'Layman chat', link: '/layman-chat' },
-    { name: 'History', link: '/history' },
-    { name: 'Files chat', link: '/files-chat' },
-    { name: 'Collaborate', link: '/collaborate' },
+    { name: 'Home', link: '/dashboard' },
+    { name: 'New Upload', link: '/upload' },
+    { name: 'New Chat', link: '/layman-chat' },
     { name: 'Feasibility', link: '/feasibility' },
     { name: 'Roadmap', link: '/Roadmap' },
-    { name: 'Recommendations', link: '/recommendations' },
-    { name: 'Settings', link: '/settings' },
+    { name: 'Trends', link: '/recommendations' },
+    { name: 'My Projects', link: '/history' },
+    { name: 'Profile', link: '/trends' }
 ];
 
 const SideNav = () => {

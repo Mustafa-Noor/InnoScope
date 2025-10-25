@@ -1,4 +1,4 @@
-export default function SettingsPage() {
+export default function TrendsPage() {
   return (
     <div>
       <h1 style={{ 
@@ -8,7 +8,7 @@ export default function SettingsPage() {
         marginBottom: '16px',
         fontFamily: 'Poppins, sans-serif'
       }}>
-        Settings
+        Trends & Recommedations
       </h1>
       <p style={{ 
         fontSize: '1.1rem', 
@@ -32,7 +32,7 @@ export default function SettingsPage() {
           textAlign: 'center',
           fontSize: '1.1rem'
         }}>
-          ⚙️ Settings panel coming soon...
+          ⚙️ Trends & Recommendations panel coming soon...
         </p>
       </div>
     </div>
