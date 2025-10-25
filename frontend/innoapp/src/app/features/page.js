@@ -1,9 +1,6 @@
 'use client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import Features from '../components/Features';
-import Footer from '../components/Footer';
 
 export default function FeaturesPage() {
   useEffect(() => {
@@ -12,7 +9,6 @@ export default function FeaturesPage() {
 
   return (
     <main>
-      <Navbar />
       <div style={{ paddingTop: '80px' }}>
         {/* Hero Section for Features */}
         <section className="bg-light py-5">
@@ -23,8 +19,6 @@ export default function FeaturesPage() {
             </p>
           </div>
         </section>
-        
-        <Features />
         
         {/* Additional Features Details */}
         <section className="section-padding">
@@ -54,7 +48,6 @@ export default function FeaturesPage() {
           </div>
         </section>
       </div>
-      <Footer />
     </main>
   );
 }
