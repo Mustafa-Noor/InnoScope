@@ -1,8 +1,6 @@
 'use client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { useEffect } from 'react';
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
 
 export default function ContactPage() {
   useEffect(() => {
@@ -11,7 +9,7 @@ export default function ContactPage() {
 
   return (
     <main>
-      <Navbar />
+    
       <div style={{ paddingTop: '80px' }}>
         {/* Hero Section */}
         <section className="bg-light py-5">
@@ -111,7 +109,6 @@ export default function ContactPage() {
           </div>
         </section>
       </div>
-      <Footer />
     </main>
   );
 }
