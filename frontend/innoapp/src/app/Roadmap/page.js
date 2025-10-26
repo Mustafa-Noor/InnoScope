@@ -174,7 +174,7 @@ export default function RoadmapPage() {
       formData.append('file', firstFile);
       
       // Call backend API
-      const response = await fetch(`${API_BASE}/roadmap/generate`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/roadmap/generate`, {
         method: 'POST',
         body: formData,
       });

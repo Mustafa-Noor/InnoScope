@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useRef } from "react";
+import { useAuth } from "../contexts/AuthContext";
 import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function UploadPage() {
@@ -8,6 +9,7 @@ export default function UploadPage() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploaded, setIsUploaded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { uploadDocument } = useAuth();
 
   // 🧾 Handle file selection
   const handleFolderSelect = (e) => {
@@ -16,7 +18,7 @@ export default function UploadPage() {
     setSelectedFile(selectedFiles[0]);
   };
 
-  // 💾 Upload file to backend API
+  // 💾 Upload file to backend API (delegated to AuthContext)
   const handleUpload = async () => {
     if (!selectedFile) {
       alert("Please select a file first!");
@@ -24,32 +26,24 @@ export default function UploadPage() {
     }
 
     setLoading(true);
-
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
     try {
-      // Replace with your real backend API endpoint
-      const response = await fetch("http://localhost:8000/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
+      // uploadDocument will attach auth token automatically via AuthContext
+      const result = await uploadDocument(selectedFile, '/upload');
+      if (result.success) {
         setIsUploaded(true);
       } else {
-        setIsUploaded(true);
-        alert("Error uploading file.");
+        console.error('Upload error:', result.error);
+        alert(result.error || 'Error uploading file.');
       }
-    } catch (error) {
-      console.error("Upload failed:", error);
-      alert("Failed to connect to the server.");
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('Failed to connect to the server.');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
   const handleRoadmap = () => {
-    
+
   };
   // 🧭 After upload - button actions
   const handleAction = (type) => {

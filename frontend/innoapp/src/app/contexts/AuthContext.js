@@ -108,12 +108,50 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
   };
 
+  // helper to attach auth header automatically
+  const authFetch = async (url, opts = {}) => {
+    const token = localStorage.getItem('token');
+    const headers = { ...(opts.headers || {}) };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(url, { ...opts, headers });
+    return res;
+  };
+
+  // Generate roadmap by uploading a file to backend and returning parsed result
+  // Accepts a File object and optional path (defaults to /roadmap/generate)
+  const generateRoadmap = async (file, path = '/roadmap/generate') => {
+    try {
+      if (!file) return { success: false, error: 'No file provided' };
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const endpoint = `${API_BASE}${path}`;
+      const res = await authFetch(endpoint, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => null);
+        return { success: false, error: text || `Server error: ${res.status}` };
+      }
+
+      const json = await res.json().catch(() => ({}));
+      return { success: true, data: json };
+    } catch (err) {
+      return { success: false, error: err.message || 'Roadmap generation failed' };
+    }
+  };
+
   const value = {
     user,
     loading,
     login,
     signup,
     logout,
+    authFetch,
+    generateRoadmap,
     isAuthenticated: !!user,
   };
 
