@@ -16,3 +16,4 @@ python-jose
 passlib[argon2]
 
 langgraph
+arxiv
