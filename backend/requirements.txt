@@ -14,3 +14,5 @@ asyncpg
 pydantic[email]
 python-jose
 passlib[argon2]
+
+langgraph

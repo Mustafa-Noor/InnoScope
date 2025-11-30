@@ -11,6 +11,26 @@ def summarize_research(text):
     response = call_llm(prompt)
     return response
 
+def refine_summary(previous_summary: str, state):
+    prompt = f"""
+You have an existing research summary:
+
+{previous_summary}
+
+And the following structured extracted fields:
+
+{state.model_dump()}
+
+Create a new, improved, refined summary that:
+- integrates the structured fields into one coherent summary
+- is clearer, more complete, and academically correct
+- removes redundancy
+- fills gaps from the previous summary
+
+Return plain text only.
+"""
+    return call_llm(prompt)
+
 
 # if __name__ == "__main__":
 #     # Test with sample research text
