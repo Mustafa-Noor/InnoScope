@@ -97,9 +97,6 @@ def run_full_research(file_path: str, debug: bool = True) -> ResearchState:
 				prerequisites=refined_result.get("prerequisites"),
 				key_topics=refined_result.get("key_topics"),
 				summary=refined_result.get("summary"),
-				missing_fields=refined_result.get("missing_fields"),
-				last_question=refined_result.get("last_question"),
-				followup_attempts=refined_result.get("followup_attempts", 0),
 			)
 	else:
 		intermediate = refined_result

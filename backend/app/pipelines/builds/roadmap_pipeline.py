@@ -26,6 +26,7 @@ class CombinedState(IntermediateState):
 
 def _scoping_node(state: CombinedState) -> CombinedState:
     """Run the existing scoping graph starting from current state's file_path/raw_text."""
+    print("[Roadmap] >> scoping: starting (file_path=", state.file_path, ")")
     scoping = create_scoping_graph()
     # Invoke with a fresh IntermediateState carrying file_path/raw_text (others ignored initially)
     start = IntermediateState(file_path=state.file_path, raw_text=state.raw_text)
@@ -42,14 +43,23 @@ def _scoping_node(state: CombinedState) -> CombinedState:
         "goals",
         "prerequisites",
         "key_topics",
+        "initial_summary",
         "summary",
     ]:
         setattr(state, field, getattr(result, field))
+    print(
+        "[Roadmap] << scoping: raw_len=", len(state.raw_text or ""),
+        ", summary_len=", len(state.summary or ""),
+        ", goals=", len(state.goals or []),
+        ", prerequisites=", len(state.prerequisites or []),
+        ", key_topics=", len(state.key_topics or []),
+    )
     return state
 
 
 def _research_node(state: CombinedState) -> CombinedState:
     """Run enrichment + synthesis using ResearchState wrapping current intermediate."""
+    print("[Roadmap] >> research: preparing enrichment (has_summary=", bool(state.summary), ")")
     if not state.summary:
         return state  # cannot enrich without summary
     research_state = ResearchState(intermediate=IntermediateState(
@@ -64,11 +74,18 @@ def _research_node(state: CombinedState) -> CombinedState:
     ))
     research_state = run_research_enrichment(research_state, debug=False)
     state.research = research_state
+    print(
+        "[Roadmap] << research: wiki_present=", bool(getattr(research_state, "wiki_summary", None)),
+        ", ddg_results=", len(getattr(research_state, "ddg_results", []) or []),
+        ", consolidated_len=", len(research_state.consolidated_research or ""),
+        ", llm_report_len=", len(research_state.llm_research_report or ""),
+    )
     return state
 
 
 def _roadmap_node(state: CombinedState) -> CombinedState:
     """Generate roadmap using all available research layers."""
+    print("[Roadmap] >> roadmap: generating (has_research=", bool(state.research), ")")
     llm_report = None
     consolidated = None
     summary = state.summary
@@ -77,9 +94,23 @@ def _roadmap_node(state: CombinedState) -> CombinedState:
         consolidated = state.research.consolidated_research
         # summary already exists in intermediate
     if not (llm_report or consolidated or summary):
+        print("[Roadmap] !! roadmap: skipped (no inputs available)")
         return state
     roadmap = generate_roadmap(llm_report, consolidated, summary)
     state.roadmap = roadmap.strip() if isinstance(roadmap, str) else roadmap
+    print(
+        "[Roadmap] << roadmap: output_len=", len(state.roadmap or ""),
+        ", headings_present=", sum(1 for h in [
+            "1. Prototype Development",
+            "2. Testing & Validation",
+            "3. Funding & Grants",
+            "4. Manufacturing / Implementation",
+            "5. Marketing & Promotion",
+            "6. Launch / Deployment",
+            "7. Maintenance & Iteration",
+            "8. Scaling & Expansion",
+        ] if (state.roadmap or "").find(h) != -1),
+    )
     return state
 
 
@@ -98,13 +129,21 @@ def create_roadmap_graph():
 def run_roadmap_pipeline(file_path: str) -> RoadmapPipelineOutput:
     graph = create_roadmap_graph()
     initial = CombinedState(file_path=file_path)
+    print("[Roadmap] START pipeline")
     result = graph.invoke(initial)
     # If result is dict (compiled graph), reconstruct CombinedState
     if isinstance(result, dict):
         result = CombinedState(**result)
     status = "success" if result.roadmap else "warning"
     message = "Roadmap generated" if result.roadmap else "Roadmap missing (no source text)"
-    return RoadmapPipelineOutput(status=status, message=message, roadmap=result.roadmap)
+    print(f"[Roadmap] END pipeline status={status}")
+    return RoadmapPipelineOutput(
+        status=status,
+        message=message,
+        roadmap=result.roadmap,
+        initial_summary=result.initial_summary,
+        refined_summary=result.summary,
+    )
 
 
 __all__ = ["create_roadmap_graph", "run_roadmap_pipeline", "CombinedState"]

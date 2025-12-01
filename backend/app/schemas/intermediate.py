@@ -23,6 +23,10 @@ class RoadmapPipelineOutput(BaseModel):
 
     roadmap: Optional[str] = Field(None, description="Generated roadmap from the research paper")
 
+    initial_summary: Optional[str] = Field(None, description="Initial summary before refinement")
+    refined_summary: Optional[str] = Field(None, description="Generated summary of the research paper")
+
+
 
 class IntermediateState(BaseModel):
 
@@ -51,6 +55,7 @@ class IntermediateState(BaseModel):
     # Generated summary (final output)
 
     summary: Optional[str] = Field(None, description="Generated summary of the research paper")
+    initial_summary: Optional[str] = Field(None, description="Initial summary before refinement")
 
 
 

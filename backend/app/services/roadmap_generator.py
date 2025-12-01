@@ -63,55 +63,7 @@ def generate_roadmap(
         "Return ONLY the roadmap with the exact headings and subsections."
     )
 
-    # Call LLM
+    # Call LLM and return as-is (no skeleton fallbacks)
     response = call_llm(prompt) or ""
     text = response.strip()
-
-    # -------------------------
-    # Ensure all headings exist
-    # -------------------------
-    presence = {h: False for h in HEADINGS}
-
-    for h in HEADINGS:
-        if re.search(rf"^\s*{re.escape(h)}\b", text, flags=re.MULTILINE):
-            presence[h] = True
-
-    # If nothing present → create full skeleton
-    if not any(presence.values()):
-        hint = primary.split(". ")[0][:120]
-        skel = []
-        for h in HEADINGS:
-            skel.append(
-                f"{h}\n"
-                f"Objective: {hint}.\n"
-                "Key Actions:\n"
-                "- Action 1\n"
-                "- Action 2\n"
-                "- Action 3\n"
-                "Metrics:\n"
-                "- Metric A\n"
-                "- Metric B\n"
-                "Risks & Mitigations:\n"
-                "- Risk: Example | Mitigation: Placeholder"
-            )
-        return "\n\n".join(skel)
-
-    # If some headings missing → append skeletons for those
-    missing_sections = []
-    for h, ok in presence.items():
-        if not ok:
-            missing_sections.append(
-                f"{h}\n"
-                "Objective: (to be defined).\n"
-                "Key Actions:\n"
-                "- TBD\n"
-                "Metrics:\n"
-                "- TBD\n"
-                "Risks & Mitigations:\n"
-                "- Risk: TBD | Mitigation: TBD"
-            )
-
-    if missing_sections:
-        text += "\n\n" + "\n\n".join(missing_sections)
-
     return text
