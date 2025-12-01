@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 from app.schemas.research_state import ResearchState
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 from app.pipelines.nodes.llm import research_llm_router_node
 from app.pipelines.builds.scoping import create_graph as create_refined_graph
 

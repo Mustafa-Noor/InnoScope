@@ -4,7 +4,7 @@ import re
 from app.services.summarize_research import summarize_research
 
 
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 

@@ -4,7 +4,7 @@ import re
 from app.utils.llm import call_llm
 
 
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 

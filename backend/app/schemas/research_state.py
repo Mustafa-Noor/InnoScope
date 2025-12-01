@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List
 # IMPORTANT: Use the same IntermediateState definition as the refined summary pipeline
 # to avoid pydantic model type mismatch errors.
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 class ResearchState(BaseModel):

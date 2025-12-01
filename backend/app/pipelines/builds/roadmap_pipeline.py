@@ -11,7 +11,7 @@ Returns a CombinedState; helper converts to RoadmapPipelineOutput.
 from typing import Optional
 from langgraph.graph import StateGraph, END
 
-from app.schemas.roadmap import IntermediateState, RoadmapPipelineOutput
+from app.schemas.intermediate import IntermediateState, RoadmapPipelineOutput
 from app.schemas.research_state import ResearchState
 from app.pipelines.builds.scoping import create_graph as create_scoping_graph
 from app.pipelines.builds.researcher import run_research_enrichment
@@ -43,9 +43,6 @@ def _scoping_node(state: CombinedState) -> CombinedState:
         "prerequisites",
         "key_topics",
         "summary",
-        "missing_fields",
-        "last_question",
-        "followup_attempts",
     ]:
         setattr(state, field, getattr(result, field))
     return state

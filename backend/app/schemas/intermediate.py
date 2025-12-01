@@ -32,6 +32,8 @@ class IntermediateState(BaseModel):
 
     file_path: Optional[str] = None
 
+    is_research_like: Optional[bool] = None
+
 
     # Required research fields
 
@@ -49,15 +51,6 @@ class IntermediateState(BaseModel):
     # Generated summary (final output)
 
     summary: Optional[str] = Field(None, description="Generated summary of the research paper")
-
-
-    # Agent control (for LangGraph loop)
-
-    missing_fields: Optional[List[str]] = None
-
-    last_question: Optional[str] = None
-
-    followup_attempts: int = 0
 
 
 

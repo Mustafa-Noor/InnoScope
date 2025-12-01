@@ -10,13 +10,13 @@ from app.services.roadmap_generator import generate_roadmap
 from app.utils.extract import extract_text
 
 
-from app.schemas.roadmap import RoadmapPipelineInput, RoadmapPipelineOutput
+from app.schemas.intermediate import RoadmapPipelineInput, RoadmapPipelineOutput
 from app.utils.llm import call_llm
 
 
 from pydantic import ValidationError
 
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 
@@ -111,21 +111,21 @@ def run_pipeline(file_path: str, user_input: str | None = None):
     }
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
 
 
-    print("Testing Roadmap Pipeline")
-    print("==================================================")
+#     print("Testing Roadmap Pipeline")
+#     print("==================================================")
 
 
-    test_file = os.path.join(os.path.dirname(__file__), "test.docx")
+#     test_file = os.path.join(os.path.dirname(__file__), "test.docx")
 
 
-    if os.path.exists(test_file):
-        result = run_pipeline(test_file)
-        print(result)
+#     if os.path.exists(test_file):
+#         result = run_pipeline(test_file)
+#         print(result)
 
-    else:
+#     else:
 
 
-        print(f"❌ test.docx not found at {test_file}")
+#         print(f"❌ test.docx not found at {test_file}")

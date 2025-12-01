@@ -1,5 +1,5 @@
 from app.services.extract_fields import extract_fields_from_summary as llm_extract_fields
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 def fill_state_node(state: IntermediateState):

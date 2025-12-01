@@ -1,7 +1,7 @@
 from app.utils.extract import extract_text
 
 
-from app.schemas.roadmap import IntermediateState
+from app.schemas.intermediate import IntermediateState
 
 
 def extract_text_node(state: IntermediateState):
