@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.database import get_db
@@ -75,6 +76,33 @@ async def login_user(request: UserLogin, db: AsyncSession = Depends(get_db)):
             "first_name": db_user.first_name,
             "last_name": db_user.last_name
         }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("ERROR:", e)
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@router.post("/token")
+async def login_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
+    """OAuth2 password flow compatible endpoint for Swagger Authorize dialog.
+    Treats `username` as email.
+    """
+    try:
+        stmt = select(User).where(User.email == form_data.username)
+        result = await db.execute(stmt)
+        db_user = result.scalar_one_or_none()
+
+        if not db_user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        if not hashing.verify_password(form_data.password, db_user.password):
+            raise HTTPException(status_code=401, detail="Invalid credentials")
+
+        access_token = jwt_token.create_access_token(data={"sub": str(db_user.id)})
+        return {"access_token": access_token, "token_type": "bearer"}
 
     except HTTPException:
         raise
