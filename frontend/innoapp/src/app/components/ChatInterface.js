@@ -1,9 +1,9 @@
 "use client";
 import { useState, useRef, useEffect } from 'react';
-import { useAuth } from "../contexts/AuthContext";
 
 export function ChatInterface({ onClose }) {
-  const { authFetch, loading: authLoading } = useAuth();
+  const BUILT_IN_API_KEY = process.env.NEXT_PUBLIC_TEST_API_KEY || 'test-api-key';
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -51,9 +51,9 @@ export function ChatInterface({ onClose }) {
 
     try {
       const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
-      const res = await authFetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/chat/send-message`, {
+      const res = await fetch(`${API_BASE}/chat/send-message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BUILT_IN_API_KEY}` },
         body: JSON.stringify(payload),
       });
 
@@ -74,7 +74,7 @@ export function ChatInterface({ onClose }) {
     }
   };
 
-  if (authLoading) return <div>Loading...</div>;
+  // Note: auth loading removed for local/testing convenience.
 
   return (
     <div className="chat-overlay">
