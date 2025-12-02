@@ -11,6 +11,56 @@ def summarize_research(text):
     response = call_llm(prompt)
     return response
 
+def refine_summary(previous_summary: str, state):
+    prompt = f"""
+You have an existing research summary:
+
+{previous_summary}
+
+And the following structured extracted fields:
+
+{state.model_dump()}
+
+Create a new, improved, refined summary that:
+- integrates the structured fields into one coherent summary
+- is clearer, more complete, and academically correct
+- removes redundancy
+- fills gaps from the previous summary
+
+Return plain text only.
+"""
+    return call_llm(prompt)
+
+
+def refine_summary_research_style(previous_summary: str, state):
+        """
+        Produce a long-form refined summary in research style with clear headings
+        (e.g., Abstract, Introduction, Background, Methodology/Approach, System Design,
+        Implementation, Results/Expected Outcomes, Limitations, Future Work, Conclusion).
+        Integrate structured fields from the state.
+        """
+        prompt = f"""
+You are an expert technical writer. Rewrite the summary below into a comprehensive
+research-style document with multiple headings.
+
+Existing summary:
+{previous_summary}
+
+Structured fields:
+{state.model_dump()}
+
+Requirements:
+- Use these headings (adapt if some are not applicable but keep structure):
+    Abstract, Introduction, Background, Methodology/Approach, System Design,
+    Implementation, Results/Expected Outcomes, Limitations, Future Work, Conclusion.
+- Be detailed but concise per section (2–6 paragraphs total across the document).
+- Integrate problem statement, domain, goals, prerequisites, and key topics throughout.
+- Maintain clarity and academic tone.
+- If some fields are missing or the user was unsure, make reasonable assumptions based on context; briefly note assumptions where relevant.
+- Return plain text only with headings.
+"""
+        return call_llm(prompt)
+
 
 # if __name__ == "__main__":
 #     # Test with sample research text

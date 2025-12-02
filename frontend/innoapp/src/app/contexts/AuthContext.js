@@ -41,15 +41,20 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
+      // Use OAuth2 password flow to match backend /auth/token
+      const form = new URLSearchParams();
+      form.append('username', email);
+      form.append('password', password);
+
+      const res = await fetch(`${API_BASE}/auth/token`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
+      if (!res.ok || !data?.access_token) {
         return { success: false, error: data?.detail || 'Login failed' };
       }
 
@@ -60,8 +65,8 @@ export function AuthProvider({ children }) {
       const meRes = await fetch(`${API_BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
-      const userData = await meRes.json();
-      setUser(userData);
+      const userData = await meRes.json().catch(() => null);
+      if (meRes.ok && userData) setUser(userData);
 
       return { success: true };
     } catch (error) {

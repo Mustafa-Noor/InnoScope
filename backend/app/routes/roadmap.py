@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.pipelines.basic_roadmap import run_basic_roadmap_pipeline
+from app.pipelines.builds.roadmap_pipeline import run_roadmap_pipeline
 from fastapi import UploadFile, File
 import tempfile
 import os
@@ -19,7 +19,7 @@ async def generate_roadmap(file: UploadFile = File(...)):
         file: Uploaded document file (PDF or DOCX)
         
     Returns:
-        dict: Contains status, message, summary, and roadmap
+        dict: Contains status, message, initial_summary, refined_summary, and roadmap
     """
     # Check file type
     allowed_extensions = ['.pdf', '.docx']
@@ -39,29 +39,31 @@ async def generate_roadmap(file: UploadFile = File(...)):
             temp_file.write(content)
             temp_file_path = temp_file.name
         
-        # Run the roadmap pipeline
-        result = run_basic_roadmap_pipeline(temp_file_path)
+        # Run the unified roadmap pipeline (scoping + research + roadmap)
+        output = run_roadmap_pipeline(temp_file_path)
         
         # Clean up temporary file
         os.unlink(temp_file_path)
         
         # Return the result
-        if result["status"] == "success":
+        if output.status == "success":
             return {
                 "success": True,
-                "message": result["message"],
-                "summary": result["summary"],
-                "roadmap": result["roadmap"]
+                "message": output.message,
+                "initial_summary": output.initial_summary,
+                "refined_summary": output.refined_summary,
+                "roadmap": output.roadmap,
             }
-        elif result["status"] == "warning":
+        elif output.status == "warning":
             return {
                 "success": False,
-                "message": result["message"],
-                "summary": None,
-                "roadmap": None
+                "message": output.message,
+                "initial_summary": output.initial_summary,
+                "refined_summary": output.refined_summary,
+                "roadmap": output.roadmap,
             }
         else:
-            raise HTTPException(status_code=500, detail=result["message"])
+            raise HTTPException(status_code=500, detail=output.message)
             
     except Exception as e:
         # Clean up temp file if it exists
