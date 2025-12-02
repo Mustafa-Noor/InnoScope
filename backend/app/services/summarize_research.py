@@ -1,4 +1,4 @@
-from app.utils.llm import call_llm
+from utils.llm import call_llm
 
 
 def summarize_research(text):

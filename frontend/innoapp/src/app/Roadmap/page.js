@@ -7,6 +7,7 @@ export default function RoadmapPage() {
   const [files, setFiles] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [roadmapData, setRoadmapData] = useState(null);
+  const [showSummary, setShowSummary] = useState(false);
   const folderInputRef = useRef(null);
 
   // Handle file selection
@@ -239,6 +240,8 @@ export default function RoadmapPage() {
       };
       
       setRoadmapData(roadmapData);
+      // Ensure summary is hidden after generating roadmap (user must request it)
+      setShowSummary(false);
       
     } catch (error) {
       console.error('Error generating roadmap:', error);
@@ -251,6 +254,87 @@ export default function RoadmapPage() {
       } else {
         alert('Error generating roadmap. Please try again.');
       }
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle summarization (calls backend if available, otherwise sets fallback)
+  const handleSummarize = async () => {
+    if (!selectedFolder || files.length === 0) {
+      alert('Please select a file first');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', files[0]);
+
+      const res = await fetch(`${API_BASE}/roadmap/summarize`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        // fallback: try to call same generate endpoint and use its summary
+        const fallback = await fetch(`${API_BASE}/roadmap/generate`, { method: 'POST', body: formData });
+        const fbData = await fallback.json().catch(() => ({}));
+        if (fallback.ok && fbData.summary) {
+          setRoadmapData((d) => ({ ...(d || {}), summary: fbData.summary }));
+        } else {
+          alert('Summarization not available on server.');
+        }
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      if (data?.summary) {
+        setRoadmapData((d) => ({ ...(d || {}), summary: data.summary }));
+        setShowSummary(true);
+      } else if (data?.text) {
+        setRoadmapData((d) => ({ ...(d || {}), summary: data.text }));
+        setShowSummary(true);
+      } else {
+        alert('No summary returned');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error while summarizing.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle feasibility analysis
+  const handleFeasibility = async () => {
+    if (!selectedFolder || files.length === 0) {
+      alert('Please select a file first');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', files[0]);
+
+      const res = await fetch(`${API_BASE}/roadmap/feasibility`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data) {
+        // attach feasibility result to roadmapData for display
+        setRoadmapData((d) => ({ ...(d || {}), feasibility: data }));
+        // do not show summary
+        setShowSummary(false);
+      } else {
+        alert('Feasibility analysis not available on server.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error while running feasibility.');
     } finally {
       setIsGenerating(false);
     }
@@ -376,60 +460,66 @@ export default function RoadmapPage() {
               Browse Files
             </label>
           </div>
+            {/* Selected Files Info */}
+            {selectedFolder && (
+              <div style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                border: '1px solid rgba(16, 185, 129, 0.2)',
+                borderRadius: '12px',
+                padding: '20px',
+                marginBottom: '20px'
+              }}>
+                <h4 style={{ 
+                  color: '#059669', 
+                  marginBottom: '12px',
+                  fontFamily: 'Poppins, sans-serif',
+                  fontWeight: '600'
+                }}>
+                  Selected Files
+                </h4>
+                <p style={{ 
+                  color: '#374151', 
+                  marginBottom: '8px',
+                  fontFamily: 'Poppins, sans-serif'
+                }}>
+                  Found {files.length} relevant files
+                </p>
+                <div style={{ 
+                  maxHeight: '150px', 
+                  overflowY: 'auto',
+                  textAlign: 'left'
+                }}>
+                  {files.slice(0, 10).map((file, index) => (
+                    <div key={index} style={{ 
+                      padding: '4px 0',
+                      fontSize: '0.9rem',
+                      color: '#6b7280',
+                      fontFamily: 'Poppins, sans-serif'
+                    }}>
+                      📄 {file.name}
+                    </div>
+                  ))}
+                  {files.length > 10 && (
+                    <div style={{ 
+                      padding: '4px 0',
+                      fontSize: '0.9rem',
+                      color: '#6b7280',
+                      fontStyle: 'italic',
+                      fontFamily: 'Poppins, sans-serif'
+                    }}>
+                      ... and {files.length - 10} more files
+                    </div>
+                  )}
+                </div>
 
-          {/* Selected Files Info */}
-          {selectedFolder && (
-            <div style={{
-              backgroundColor: 'rgba(16, 185, 129, 0.05)',
-              border: '1px solid rgba(16, 185, 129, 0.2)',
-              borderRadius: '12px',
-              padding: '20px',
-              marginBottom: '20px'
-            }}>
-              <h4 style={{ 
-                color: '#059669', 
-                marginBottom: '12px',
-                fontFamily: 'Poppins, sans-serif',
-                fontWeight: '600'
-              }}>
-                Selected Files
-              </h4>
-              <p style={{ 
-                color: '#374151', 
-                marginBottom: '8px',
-                fontFamily: 'Poppins, sans-serif'
-              }}>
-                Found {files.length} relevant files
-              </p>
-              <div style={{ 
-                maxHeight: '150px', 
-                overflowY: 'auto',
-                textAlign: 'left'
-              }}>
-                {files.slice(0, 10).map((file, index) => (
-                  <div key={index} style={{ 
-                    padding: '4px 0',
-                    fontSize: '0.9rem',
-                    color: '#6b7280',
-                    fontFamily: 'Poppins, sans-serif'
-                  }}>
-                    📄 {file.name}
-                  </div>
-                ))}
-                {files.length > 10 && (
-                  <div style={{ 
-                    padding: '4px 0',
-                    fontSize: '0.9rem',
-                    color: '#6b7280',
-                    fontStyle: 'italic',
-                    fontFamily: 'Poppins, sans-serif'
-                  }}>
-                    ... and {files.length - 10} more files
-                  </div>
-                )}
+                {/* ACTIONS: show Summarize / Roadmap / Feasibility only after file selected */}
+                <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center', gap: 12 }}>
+                  <button onClick={handleSummarize} className="btn" style={{ padding: '10px 16px', borderRadius: 10, background: '#f1f5f9' }}>Summarize</button>
+                  <button onClick={handleGenerateRoadmap} className="btn btn-success" style={{ padding: '10px 16px', borderRadius: 10, background: '#059669', color: 'white' }}>Generate Roadmap</button>
+                  <button onClick={handleFeasibility} className="btn" style={{ padding: '10px 16px', borderRadius: 10, background: '#eef2ff' }}>Feasibility</button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Generate Roadmap Button */}
           <button
@@ -534,8 +624,26 @@ export default function RoadmapPage() {
               Implementation Roadmap for {roadmapData.projectName}
             </h2>
 
-            {/* Research Summary */}
-            {roadmapData.summary && (
+            {/* Research Summary (only shown when user requests it) */}
+            {roadmapData?.summary && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+                <button
+                  onClick={() => setShowSummary((s) => !s)}
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 8,
+                    border: '1px solid rgba(16,185,129,0.12)',
+                    background: showSummary ? '#059669' : '#f1f5f9',
+                    color: showSummary ? 'white' : '#0f172a',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {showSummary ? 'Hide Summary' : 'View Summary'}
+                </button>
+              </div>
+            )}
+
+            {showSummary && roadmapData?.summary && (
               <div style={{
                 backgroundColor: '#f0f9ff',
                 border: '1px solid #0ea5e9',

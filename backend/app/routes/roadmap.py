@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from app.pipelines.basic_roadmap import run_basic_roadmap_pipeline
+from pipelines.basic_roadmap import run_basic_roadmap_pipeline
 from fastapi import UploadFile, File
 import tempfile
 import os

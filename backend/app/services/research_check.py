@@ -1,5 +1,5 @@
-from app.utils.llm import call_llm
-from app.utils.extract import extract_text
+from utils.llm import call_llm
+from utils.extract import extract_text
 
 def check_if_research(text):
     prompt = f"""

@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-from ..config import settings
-from ..schemas.token import TokenData
+from config import settings
+from schemas.token import TokenData
 from fastapi import HTTPException
 
 
