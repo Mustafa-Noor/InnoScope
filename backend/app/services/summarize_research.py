@@ -56,6 +56,7 @@ Requirements:
 - Be detailed but concise per section (2–6 paragraphs total across the document).
 - Integrate problem statement, domain, goals, prerequisites, and key topics throughout.
 - Maintain clarity and academic tone.
+- If some fields are missing or the user was unsure, make reasonable assumptions based on context; briefly note assumptions where relevant.
 - Return plain text only with headings.
 """
         return call_llm(prompt)

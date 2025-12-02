@@ -1,13 +1,13 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import HTTPException
-from sqlalchemy import update
+from sqlalchemy import update, func
 
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from app.models.chat import ChatSession, ChatMessage, SenderType
+from app.models.chat import ChatSession, ChatMessage, SenderType, ChatSessionState
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.utils.llm import call_llm
-from app.pipelines.builds.chat_agent import run_chat_turn
+from app.pipelines.builds.chat_agent import run_chat_turn, create_chat_graph, ChatState
 from fastapi import BackgroundTasks
 
 async def handle_chat(
@@ -81,8 +81,50 @@ async def handle_chat(
 
     print("Context sent to LLM:\n", combined_context)
 
-    # 5. Delegate to LangGraph chat agent build
-    chat_state = run_chat_turn(combined_context)
+    # 4.1 Compute conversation pairs (approximate). Count existing DB messages + current user message
+    try:
+        cnt_res = await db.execute(
+            select(func.count(ChatMessage.id)).where(ChatMessage.session_id == session.id)
+        )
+        total_messages = int(cnt_res.scalar() or 0) + 1  # +1 for the current uncommitted user message
+    except Exception:
+        total_messages = len(recent_messages) + 1
+    message_pairs = total_messages // 2
+
+    # 5. Delegate to LangGraph chat agent build, seeding with any saved session state
+    seeded_state = None
+    try:
+        result_state = await db.execute(
+            select(ChatSessionState).where(ChatSessionState.session_id == session.id)
+        )
+        existing = result_state.scalar_one_or_none()
+        if existing is not None:
+            seeded_state = ChatState(
+                memory_text=combined_context,
+                problem_statement=existing.problem_statement,
+                domain=existing.domain,
+                goals=existing.goals,
+                prerequisites=existing.prerequisites,
+                key_topics=existing.key_topics,
+                initial_summary=existing.initial_summary,
+                summary=existing.refined_summary or existing.initial_summary,
+            )
+    except Exception:
+        seeded_state = None
+
+    if seeded_state is not None:
+        graph = create_chat_graph()
+        seeded_state.message_pairs = message_pairs
+        chat_state = graph.invoke(seeded_state)
+        if isinstance(chat_state, dict):
+            chat_state = ChatState(**chat_state)
+    else:
+        # pass pairs via initial state by calling graph directly
+        graph = create_chat_graph()
+        start = ChatState(memory_text=combined_context, message_pairs=message_pairs)
+        chat_state = graph.invoke(start)
+        if isinstance(chat_state, dict):
+            chat_state = ChatState(**chat_state)
     reply_text = chat_state.reply_text or "Could you share more details?"
 
     # 6. Save assistant message
@@ -94,10 +136,48 @@ async def handle_chat(
     db.add(bot_msg)
     await db.commit()
 
-    # 7. Background task to update memory
+    # 7. Upsert structured state snapshot for this session
+    # Note: chat_state may contain fields and summaries populated by the graph
+    try:
+        result_state = await db.execute(
+            select(ChatSessionState).where(ChatSessionState.session_id == session.id)
+        )
+        existing = result_state.scalar_one_or_none()
+        if existing is None:
+            snapshot = ChatSessionState(
+                session_id=session.id,
+                problem_statement=getattr(chat_state, "problem_statement", None),
+                domain=getattr(chat_state, "domain", None),
+                goals=getattr(chat_state, "goals", None),
+                prerequisites=getattr(chat_state, "prerequisites", None),
+                key_topics=getattr(chat_state, "key_topics", None),
+                initial_summary=getattr(chat_state, "initial_summary", None),
+                refined_summary=getattr(chat_state, "summary", None),
+            )
+            db.add(snapshot)
+        else:
+            await db.execute(
+                update(ChatSessionState)
+                .where(ChatSessionState.session_id == session.id)
+                .values(
+                    problem_statement=getattr(chat_state, "problem_statement", existing.problem_statement),
+                    domain=getattr(chat_state, "domain", existing.domain),
+                    goals=getattr(chat_state, "goals", existing.goals),
+                    prerequisites=getattr(chat_state, "prerequisites", existing.prerequisites),
+                    key_topics=getattr(chat_state, "key_topics", existing.key_topics),
+                    initial_summary=getattr(chat_state, "initial_summary", existing.initial_summary),
+                    refined_summary=getattr(chat_state, "summary", existing.refined_summary),
+                )
+            )
+        await db.commit()
+    except Exception:
+        # non-fatal: continue even if snapshot fails
+        pass
+
+    # 8. Background task to update memory
     background_tasks.add_task(update_session_memory, session.id, db)
 
-    # 8. Return response
+    # 9. Return response
     return ChatResponse(
         session_id=session.id,
         reply=reply_text,

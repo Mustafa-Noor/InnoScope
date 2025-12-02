@@ -15,6 +15,8 @@ class ChatState(IntermediateState):
     reply_text: Optional[str] = None
     missing_fields: Optional[List[str]] = None
     completed: Optional[bool] = None
+    message_pairs: Optional[int] = 0
+    assume_ok: Optional[bool] = False
 
 
 def _finalize_node(state: ChatState) -> ChatState:
