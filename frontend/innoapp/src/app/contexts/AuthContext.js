@@ -12,7 +12,19 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
+        // If no token found, inject a dummy token and dummy user for local development/testing.
+        // This makes the app behave as if a user is already logged in.
         if (!token) {
+          const DUMMY_TOKEN = 'dummy-local-token';
+          const DUMMY_USER = { id: 'local-user', email: 'local@dev', first_name: 'Local', last_name: 'Tester', name: 'Local Tester' };
+          try {
+            localStorage.setItem('token', DUMMY_TOKEN);
+            // persist dummy user so other components (chat) can read the id
+            localStorage.setItem('user', JSON.stringify(DUMMY_USER));
+            setUser(DUMMY_USER);
+          } catch (e) {
+            console.warn('Unable to write dummy token to localStorage', e);
+          }
           setLoading(false);
           return;
         }
@@ -62,6 +74,7 @@ export function AuthProvider({ children }) {
       });
       const userData = await meRes.json();
       setUser(userData);
+      try { localStorage.setItem('user', JSON.stringify(userData)); } catch (e) { /* ignore */ }
 
       return { success: true };
     } catch (error) {
@@ -106,6 +119,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('token');
+    try { localStorage.removeItem('user'); } catch (e) { /* ignore */ }
   };
 
   // helper to attach auth header automatically

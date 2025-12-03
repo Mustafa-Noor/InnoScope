@@ -50,7 +50,19 @@ export function ChatInterface({ onClose }) {
     setSending(true);
 
     try {
+      // include user id from localStorage when available so backend can map to the dummy user
+      let userId = null;
+      try {
+        const stored = localStorage.getItem('user');
+        if (stored) {
+          const u = JSON.parse(stored);
+          if (u && u.id) userId = u.id;
+        }
+      } catch (e) { /* ignore */ }
+
       const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
+      if (userId) payload.user_id = userId;
+
       const res = await fetch(`${API_BASE}/chat/send-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BUILT_IN_API_KEY}` },
