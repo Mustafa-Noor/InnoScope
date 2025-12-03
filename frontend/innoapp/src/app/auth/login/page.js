@@ -1,6 +1,6 @@
 'use server'
 import { redirect } from 'next/navigation'
 
-export default function LoginPage() {
+export default async function LoginPage() {
   redirect('/')
 }
