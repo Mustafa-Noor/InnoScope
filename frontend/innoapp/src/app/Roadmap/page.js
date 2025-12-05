@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useRef } from 'react'
 // Normalize API base and remove any trailing slashes to avoid double-slash URLs
-const API_BASE_RAW = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_RAW = process.env.NEXT_PUBLIC_API_BASE_URL;
 const API_BASE = (API_BASE_RAW || '').toString().replace(/\/+$/g, '');
 
 export default function RoadmapPage() {
@@ -10,7 +10,13 @@ export default function RoadmapPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [roadmapData, setRoadmapData] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
+  const [statusUpdates, setStatusUpdates] = useState([]); // streaming status messages
+  const [streamProgress, setStreamProgress] = useState(0);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
   const folderInputRef = useRef(null);
+  const showThinkingBox = isStreaming || isGenerating || statusUpdates.length > 0;
 
   // Handle file selection
   const handleFolderSelect = (event) => {
@@ -170,39 +176,104 @@ export default function RoadmapPage() {
     }
 
     setIsGenerating(true);
+    setIsStreaming(true);
+    setStatusUpdates([{ message: 'Starting upload to server...', progress: 0 }]);
+    setStreamProgress(0);
     
     try {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', firstFile);
       
-      // Call backend API (use API_BASE fallback to localhost for development)
-      const response = await fetch(`${API_BASE}/roadmap/generate`, {
+      // Call streaming endpoint and parse SSE
+      const response = await fetch(`${API_BASE}/roadmap/generate-stream`, {
         method: 'POST',
         body: formData,
       });
-      
-      if (!response.ok) {
+
+      if (!response.ok || !response.body) {
         console.log('Response not ok:', response);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        alert(result.message || 'Failed to generate roadmap');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let finalResult = null;
+
+      const pushStatus = (msg, prog) => {
+        setStatusUpdates((prev) => [...prev, { message: msg, progress: prog }]);
+        if (typeof prog === 'number') setStreamProgress(prog);
+      };
+
+      const handleComplete = (payload) => {
+        if (!payload) return;
+        finalResult = payload;
+      };
+
+      const processChunk = (textChunk) => {
+        buffer += textChunk;
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop(); // keep incomplete part
+        parts.forEach((part) => {
+          if (!part.trim()) return;
+          let eventType = 'message';
+          let dataLine = '';
+          part.split('\n').forEach((line) => {
+            if (line.startsWith('event:')) {
+              eventType = line.replace('event:', '').trim();
+            } else if (line.startsWith('data:')) {
+              dataLine += line.replace('data:', '').trim();
+            }
+          });
+          if (!dataLine) return;
+          let dataObj = null;
+          try {
+            dataObj = JSON.parse(dataLine);
+          } catch (e) {
+            console.warn('Could not parse SSE data', dataLine);
+            return;
+          }
+          if (eventType === 'status') {
+            pushStatus(dataObj.message || 'Working...', dataObj.progress);
+          } else if (eventType === 'error') {
+            pushStatus(dataObj.error || 'Error', undefined);
+          } else if (eventType === 'complete') {
+            handleComplete(dataObj);
+          }
+        });
+      };
+
+      // Stream read
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const textChunk = decoder.decode(value, { stream: true });
+        processChunk(textChunk);
+      }
+
+      // If there is trailing buffer, process it
+      if (buffer.trim()) {
+        processChunk('\n\n'); // force flush remaining
+      }
+
+      // If we never received a complete event, raise
+      if (!finalResult) {
+        throw new Error('Streaming finished without a complete event');
+      }
+
+      if (!finalResult.success) {
+        alert(finalResult.message || 'Failed to generate roadmap');
         return;
       }
-      
+
       // Parse the roadmap text into structured phases
-      const parsedPhases = parseRoadmapText(result.roadmap);
-      
+      const parsedPhases = parseRoadmapText(finalResult.roadmap || '');
+
       // Add estimated durations based on phase content
-      parsedPhases.forEach((phase, index) => {
-        // Estimate duration based on phase type and complexity
+      parsedPhases.forEach((phase) => {
         const taskCount = phase.tasks.length;
         const phaseName = phase.name.toLowerCase();
-        
         if (phaseName.includes('prototype') || phaseName.includes('development')) {
           phase.duration = taskCount > 5 ? '6-8 weeks' : '4-6 weeks';
         } else if (phaseName.includes('testing') || phaseName.includes('validation')) {
@@ -220,11 +291,10 @@ export default function RoadmapPage() {
         } else if (phaseName.includes('scaling') || phaseName.includes('expansion')) {
           phase.duration = '6-12 months';
         } else {
-          // Default estimation based on task complexity
           phase.duration = taskCount > 6 ? '6-10 weeks' : taskCount > 3 ? '3-6 weeks' : '2-4 weeks';
         }
       });
-      
+
       // If no phases were parsed, create a fallback
       if (parsedPhases.length === 0) {
         parsedPhases.push({
@@ -235,19 +305,22 @@ export default function RoadmapPage() {
           objective: 'Transform research findings into actionable implementation plan'
         });
       }
-      
+
       const roadmapData = {
         projectName: firstFile.name.replace(/\.[^/.]+$/, ''), // Remove file extension
         phases: parsedPhases,
-        summary: result.summary
+        summary: finalResult.refined_summary || finalResult.initial_summary || ''
       };
-      
+
       setRoadmapData(roadmapData);
-      // Ensure summary is hidden after generating roadmap (user must request it)
       setShowSummary(false);
+      setToastMessage('Roadmap generated successfully');
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3500);
       
     } catch (error) {
       console.error('Error generating roadmap:', error);
+      setStatusUpdates((prev) => [...prev, { message: `Error: ${error.message || 'Unknown issue'}`, progress: undefined }]);
       
       // Show more specific error messages
       if (error.message.includes('Failed to fetch')) {
@@ -259,6 +332,7 @@ export default function RoadmapPage() {
       }
     } finally {
       setIsGenerating(false);
+      setIsStreaming(false);
     }
   };
 
@@ -348,6 +422,9 @@ export default function RoadmapPage() {
     setSelectedFolder(null);
     setFiles([]);
     setRoadmapData(null);
+    setStatusUpdates([]);
+    setStreamProgress(0);
+    setIsStreaming(false);
     if (folderInputRef.current) {
       folderInputRef.current.value = '';
     }
@@ -576,6 +653,43 @@ export default function RoadmapPage() {
               </>
             )}
           </button>
+
+          {/* Thinking / status box below the main button */}
+          {showThinkingBox && (
+            <div style={{
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              padding: '14px 16px',
+              marginTop: '16px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, color: '#0f172a' }}>Generating roadmap...</span>
+                <span style={{ fontSize: '12px', color: '#475569' }}>{Math.min(100, Math.max(0, streamProgress || 0))}%</span>
+              </div>
+              <div style={{
+                height: '6px',
+                background: '#e2e8f0',
+                borderRadius: '999px',
+                marginTop: 8,
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${Math.min(100, Math.max(0, streamProgress || 0))}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #059669, #10b981)',
+                  transition: 'width 200ms ease'
+                }} />
+              </div>
+              <div style={{ marginTop: 10, maxHeight: 120, overflowY: 'auto', fontSize: '13px', color: '#0f172a' }}>
+                {statusUpdates.map((s, idx) => (
+                  <div key={`${s.message}-${idx}`} style={{ marginBottom: 6 }}>
+                    • {s.message} {typeof s.progress === 'number' ? `(${s.progress}%)` : ''}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {selectedFolder && (
             <button
@@ -1117,6 +1231,43 @@ export default function RoadmapPage() {
           </div>
         )}
       </div>
+
+      {/* Toast notification for completion */}
+      {showToast && (
+        <div
+          style={{
+            position: 'fixed',
+            right: '20px',
+            top: '20px',
+            background: '#0f172a',
+            color: 'white',
+            padding: '12px 16px',
+            borderRadius: '10px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}
+          role="status"
+          aria-live="polite"
+        >
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>✅ {toastMessage}</span>
+          <button
+            onClick={() => setShowToast(false)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              cursor: 'pointer',
+              fontSize: '14px'
+            }}
+            aria-label="Close notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Animations */}
       <style jsx>{`
