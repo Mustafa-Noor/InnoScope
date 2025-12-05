@@ -26,7 +26,6 @@ async def send_message(
     request: ChatRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(deps.get_current_user),
 ):
     logger.info("Called function-")
-    return await handle_chat(request, db, current_user, background_tasks)
+    return await handle_chat(request, db, None, background_tasks)

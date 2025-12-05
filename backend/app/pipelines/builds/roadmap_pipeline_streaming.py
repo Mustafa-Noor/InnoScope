@@ -5,7 +5,6 @@ to yield them as status updates for real-time frontend display.
 """
 
 from typing import Generator
-
 from app.pipelines.builds.roadmap_pipeline import (
     CombinedState,
     _scoping_node,
