@@ -479,13 +479,35 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 12px;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .new-chat-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.action-button {
+  width: 30% !important;
+  background: rgba(168, 236, 214, 0.3) !important;
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  font-weight: 700;
+  color: #012e21;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 10px;
+}
+
+.action-button:hover {
+  background: rgba(16, 185, 129, 0.5) !important;
+}
+
+.action-button.orange {
+  background: rgba(245, 221, 204, 0.3) !important;
+}
+
+.action-button.orange:hover {
+  background: rgba(249, 115, 22, 0.5) !important;
 }
 
 .sessions-list {
@@ -730,6 +752,8 @@ body {
   border-radius: 16px;
   font-size: 15px;
   line-height: 1.6;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .message.ai .message-text {
@@ -737,6 +761,82 @@ body {
   color: #1e293b;
   border: 1px solid #e2e8f0;
   border-radius: 16px 16px 16px 4px;
+}
+
+/* Markdown-like formatting for AI responses */
+.message.ai .message-text h1,
+.message.ai .message-text h2,
+.message.ai .message-text h3 {
+  font-weight: 600;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  color: #0f172a;
+}
+
+.message.ai .message-text h1 {
+  font-size: 20px;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 6px;
+}
+
+.message.ai .message-text h2 {
+  font-size: 18px;
+}
+
+.message.ai .message-text h3 {
+  font-size: 16px;
+}
+
+.message.ai .message-text p {
+  margin-bottom: 12px;
+}
+
+.message.ai .message-text ul,
+.message.ai .message-text ol {
+  margin-left: 20px;
+  margin-bottom: 12px;
+}
+
+.message.ai .message-text li {
+  margin-bottom: 6px;
+}
+
+.message.ai .message-text strong,
+.message.ai .message-text b {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.message.ai .message-text code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: #dc2626;
+}
+
+.message.ai .message-text pre {
+  background: #f1f5f9;
+  padding: 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.message.ai .message-text pre code {
+  background: transparent;
+  padding: 0;
+  color: #1e293b;
+}
+
+.message.ai .message-text blockquote {
+  border-left: 4px solid #10b981;
+  padding-left: 12px;
+  margin-left: 0;
+  margin-bottom: 12px;
+  color: #64748b;
+  font-style: italic;
 }
 
 .message.user .message-text {

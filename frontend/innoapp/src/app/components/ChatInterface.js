@@ -1,38 +1,139 @@
 "use client";
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const createWelcomeMessage = () => ({
+  id: `welcome-${Date.now()}`,
+  text: "Hello! I'm your AI research assistant. How can I help you with your research today?",
+  sender: 'ai',
+  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+});
+
+const formatTimestamp = (value) => {
+  if (!value) return '';
+  const date = typeof value === 'string' ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return '';
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+const coerceUserId = (raw) => {
+  if (raw === undefined || raw === null) return null;
+  const num = Number(raw);
+  if (Number.isFinite(num) && Number.isInteger(num) && num > 0) return String(num);
+  return null;
+};
+
+const formatMessageText = (text, sender) => {
+  if (sender !== 'ai') return text;
+  
+  let formatted = text;
+  
+  // Convert markdown headings
+  formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  
+  // Convert bold
+  formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  formatted = formatted.replace(/__(.+?)__/g, '<strong>$1</strong>');
+  
+  // Convert inline code
+  formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+  
+  // Convert bullet lists
+  formatted = formatted.replace(/^\* (.+)$/gm, '<li>$1</li>');
+  formatted = formatted.replace(/^- (.+)$/gm, '<li>$1</li>');
+  formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+  
+  // Convert numbered lists
+  formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  
+  // Convert line breaks to paragraphs
+  const paragraphs = formatted.split(/\n\n+/).map(p => {
+    if (p.trim().startsWith('<h') || p.trim().startsWith('<ul') || p.trim().startsWith('<ol') || p.trim().startsWith('<li')) {
+      return p;
+    }
+    return p.trim() ? `<p>${p.trim()}</p>` : '';
+  }).filter(p => p);
+  
+  return paragraphs.join('\n');
+};
 
 export function ChatInterface({ onClose }) {
   const BUILT_IN_API_KEY = process.env.NEXT_PUBLIC_TEST_API_KEY || 'test-api-key';
   // Default to localhost backend for local development when env is not set
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hello! I'm your AI research assistant. How can I help you with your research today?",
-      sender: 'ai',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
 
+  const [messages, setMessages] = useState(() => [createWelcomeMessage()]);
   const [inputValue, setInputValue] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [sessions] = useState([
-    { id: 1, title: 'Machine Learning Research', date: 'Today' },
-    { id: 2, title: 'Climate Change Analysis', date: 'Yesterday' },
-    { id: 3, title: 'Quantum Computing Study', date: 'Dec 1' },
-    { id: 4, title: 'Neural Networks Overview', date: 'Nov 30' },
-    { id: 5, title: 'Data Science Methods', date: 'Nov 29' }
-  ]);
-
+  const [sessions, setSessions] = useState([]);
   const [sessionId, setSessionId] = useState(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
+
+  useEffect(() => {
+    fetchSessions();
+  }, []);
 
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const resolveUserId = () => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      if (parsed && parsed.id) return coerceUserId(parsed.id);
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const fetchSessions = async () => {
+    const userId = resolveUserId() || '1';
+    try {
+      const url = new URL(`${API_BASE}/chat/sessions`);
+      url.searchParams.set('user_id', userId);
+      const res = await fetch(url.toString());
+      if (!res.ok) {
+        setSessions([]);
+        return;
+      }
+      const data = await res.json();
+      setSessions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error fetching sessions', err);
+      setSessions([]);
+    }
+  };
+
+  const loadSession = async (sid) => {
+    setSessionId(sid);
+    setMessages([]);
+    try {
+      const res = await fetch(`${API_BASE}/chat/sessions/${sid}/messages`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const formatted = (data || []).map((m, idx) => ({
+        id: m.id ?? `${sid}-${idx}`,
+        sender: m.sender === 'assistant' ? 'ai' : m.sender,
+        text: m.message || '',
+        timestamp: m.created_at ? formatTimestamp(m.created_at) : '',
+      }));
+      setMessages(formatted.length ? formatted : [createWelcomeMessage()]);
+    } catch (err) {
+      console.error('Error loading session messages', err);
+    }
+  };
+
+  const startNewChat = () => {
+    setSessionId(null);
+    setMessages([createWelcomeMessage()]);
+  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -51,18 +152,9 @@ export function ChatInterface({ onClose }) {
     setSending(true);
 
     try {
-      // include user id from localStorage when available so backend can map to the dummy user
-      let userId = null;
-      try {
-        const stored = localStorage.getItem('user');
-        if (stored) {
-          const u = JSON.parse(stored);
-          if (u && u.id) userId = u.id;
-        }
-      } catch (e) { /* ignore */ }
-
+      let userId = resolveUserId();
       const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
-      if (userId) payload.user_id = userId;
+      if (userId) payload.user_id = Number(userId);
 
       // Prefer an actual auth token stored by AuthContext, otherwise fall back to built-in key
       let authToken = BUILT_IN_API_KEY;
@@ -102,6 +194,8 @@ export function ChatInterface({ onClose }) {
       }
 
       if (data?.session_id && !sessionId) setSessionId(data.session_id);
+      fetchSessions();
+
       const reply = data?.reply || data?.message || 'No reply';
       setMessages((m) => [...m, { id: Date.now()+2, sender: 'ai', text: reply, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
     } catch (err) {
@@ -109,6 +203,121 @@ export function ChatInterface({ onClose }) {
     } finally {
       setSending(false);
     }
+  };
+
+  const latestAiMessage = () => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].sender === 'ai' && messages[i].text) return messages[i].text;
+    }
+    return null;
+  };
+
+  const hasSummaryReply = () => {
+    // Check if there's at least one user message and one AI reply (excluding welcome)
+    const userMsgs = messages.filter((m) => m.sender === 'user');
+    const aiReplies = messages.filter((m) => m.sender === 'ai' && !m.id.toString().startsWith('welcome'));
+    return userMsgs.length > 0 && aiReplies.length > 0;
+  };
+
+  const sanitizeSummaryLines = (raw) => {
+    if (!raw) return [];
+    let cleaned = raw;
+    cleaned = cleaned.replace(/\*\*/g, '');
+    cleaned = cleaned.replace(/`/g, '');
+    cleaned = cleaned.replace(/#+\s*/g, '');
+    cleaned = cleaned.replace(/\*\s+/g, '• ');
+    cleaned = cleaned.replace(/-\s+/g, '• ');
+    cleaned = cleaned.replace(/>\s+/g, '');
+    cleaned = cleaned.replace(/\[(.*?)\]\((.*?)\)/g, '$1 ($2)');
+    const lines = cleaned
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    return lines;
+  };
+
+  const buildSimplePdf = (title, summaryLines) => {
+    const lines = [title, `Generated: ${new Date().toLocaleString()}`, '', ...summaryLines];
+    const escapePdf = (s) => s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+    const startX = 50;
+    const startY = 760;
+    const lineHeight = 18;
+    const contentLines = lines.map((line, idx) => `BT /F1 12 Tf ${startX} ${startY - idx * lineHeight} Td (${escapePdf(line)}) Tj ET`).join('\n');
+    const stream = `${contentLines}\n`;
+    const encoder = new TextEncoder();
+    const streamBytes = encoder.encode(stream);
+    const contentLength = streamBytes.length;
+
+    const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`;
+    const obj2 = `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`;
+    const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>\nendobj\n`;
+    const obj4 = `4 0 obj\n<< /Length ${contentLength} >>\nstream\n${stream}endstream\nendobj\n`;
+    const obj5 = `5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n`;
+
+    const pdfParts = ['%PDF-1.4\n', obj1, obj2, obj3, obj4, obj5];
+
+    const offsets = [];
+    let cursor = 0;
+    pdfParts.forEach((part, idx) => {
+      if (idx === 0) {
+        cursor += encoder.encode(part).length;
+        return;
+      }
+      offsets.push(cursor);
+      cursor += encoder.encode(part).length;
+    });
+
+    const xrefStart = cursor;
+    const pad = (num) => num.toString().padStart(10, '0');
+    const xref = [`xref\n0 6\n0000000000 65535 f \n`];
+    offsets.forEach((off) => {
+      xref.push(`${pad(off)} 00000 n \n`);
+    });
+
+    const trailer = `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
+
+    const fullPdf = [...pdfParts, ...xref, trailer].join('');
+    return new Blob([fullPdf], { type: 'application/pdf' });
+  };
+
+  const triggerDownload = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDocs = () => {
+    const summary = latestAiMessage();
+    if (!summary) return;
+    const lines = sanitizeSummaryLines(summary);
+    const pdf = buildSimplePdf('Research Summary', lines);
+    triggerDownload(pdf, 'research_summary.pdf');
+  };
+
+  const handleGenerateRoadmap = () => {
+    const summary = latestAiMessage();
+    if (!summary) return;
+    const lines = sanitizeSummaryLines(summary);
+    const pdf = buildSimplePdf('Roadmap Input', lines);
+    triggerDownload(pdf, 'roadmap_input.pdf');
+    setMessages((m) => [
+      ...m,
+      {
+        id: `roadmap-${Date.now()}`,
+        sender: 'ai',
+        text: 'Roadmap request noted. Downloaded roadmap_input.pdf can be uploaded to the roadmap generator.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  };
+
+  const handleFeasibility = () => {
+    window.alert('Feasibility analysis is pending. We will notify you once it is available.');
   };
 
   // Note: auth loading removed for local/testing convenience.
@@ -119,16 +328,32 @@ export function ChatInterface({ onClose }) {
         {/* Sidebar */}
         <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
           <div className="sidebar-header">
-            <h3>Chat History</h3>
-            <button className="new-chat-btn">+ New Chat</button>
+            <h3>Chat History ({sessions.length})</h3>
+            <button className="new-chat-btn" onClick={startNewChat} type="button">+ New Chat</button>
           </div>
           <div className="sessions-list">
-            {sessions.map(session => (
-              <div key={session.id} className="session-item">
-                <div className="session-title">{session.title}</div>
-                <div className="session-date">{session.date}</div>
+            {sessions.length === 0 ? (
+              <div className="session-item" style={{ cursor: 'default' }}>
+                <div className="session-info">
+                  <div className="session-title">No chat sessions yet.</div>
+                  <div className="session-date">Start a new conversation to see it here.</div>
+                </div>
               </div>
-            ))}
+            ) : (
+              sessions.map((session) => (
+                <div
+                  key={session.id}
+                  className={`session-item ${sessionId === session.id ? 'active' : ''}`}
+                  onClick={() => loadSession(session.id)}
+                >
+                  <div className="session-icon">💬</div>
+                  <div className="session-info">
+                    <div className="session-title">{session.title || 'Untitled Chat'}</div>
+                    <div className="session-date">{formatTimestamp(session.created_at)}</div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </aside>
 
@@ -145,11 +370,28 @@ export function ChatInterface({ onClose }) {
           <div className="messages-area" ref={listRef}>
             {messages.map(message => (
               <div key={message.id} className={`message ${message.sender}`}>
-                <div className="message-text">{message.text}</div>
+                <div 
+                  className="message-text"
+                  dangerouslySetInnerHTML={{ __html: formatMessageText(message.text, message.sender) }}
+                />
                 <div className="message-time">{message.timestamp}</div>
               </div>
             ))}
           </div>
+
+          {latestAiMessage() && hasSummaryReply() ? (
+            <div style={{ padding: '12px 16px', display: 'flex', gap: 8, borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+              <button type="button" className="new-chat-btn action-button" onClick={handleDownloadDocs}>
+                Get Docs
+              </button>
+              <button type="button" className="new-chat-btn action-button" onClick={handleGenerateRoadmap}>
+                Get Roadmap
+              </button>
+              <button type="button" className="new-chat-btn action-button orange" onClick={handleFeasibility} style={{ background: 'rgba(249, 115, 22, 0.3)' }}>
+                Feasibility (Pending)
+              </button>
+            </div>
+          ) : null}
 
           <form onSubmit={handleSendMessage} className="chat-input-form">
             <div className="input-wrapper">
@@ -170,180 +412,3 @@ export function ChatInterface({ onClose }) {
     </div>
   );
 }
-
-
-
-
-// "use client";
-// import { useState, useRef, useEffect } from "react";
-// import { useAuth } from "../contexts/AuthContext";
-
-// export default function LaymanChatPage() {
-//   const { authFetch, isAuthenticated, loading } = useAuth();
-//   const [sessionId, setSessionId] = useState(null);
-//   const [messages, setMessages] = useState([]); // {sender: 'user'|'assistant', text}
-//   const [input, setInput] = useState("");
-//   const [sending, setSending] = useState(false);
-//   const listRef = useRef(null);
-
-//   useEffect(() => {
-//     if (listRef.current) {
-//       listRef.current.scrollTop = listRef.current.scrollHeight;
-//     }
-//   }, [messages]);
-
-//   const sendMessage = async () => {
-//     const text = input.trim();
-//     if (!text || sending) return;
-//     setSending(true);
-//     setMessages((m) => [...m, { sender: "user", text }]);
-//     setInput("");
-//     try {
-//       const payload = sessionId
-//         ? { session_id: sessionId, message: text }
-//         : { message: text, topic: "Product scoping" };
-//       const res = await authFetch(
-//         `${process.env.NEXT_PUBLIC_API_BASE_URL}/chat/send-message`,
-//         {
-//           method: "POST",
-//           headers: { "Content-Type": "application/json" },
-//           body: JSON.stringify(payload),
-//         }
-//       );
-//       const data = await res.json().catch(() => ({}));
-//       if (!res.ok) {
-//         const errText = data?.detail || `Server error: ${res.status}`;
-//         setMessages((m) => [
-//           ...m,
-//           { sender: "assistant", text: `Sorry, I couldn't process that. ${errText}` },
-//         ]);
-//         return;
-//       }
-//       if (data?.session_id && !sessionId) setSessionId(data.session_id);
-//       setMessages((m) => [...m, { sender: "assistant", text: data?.reply || "" }]);
-//     } catch (e) {
-//       setMessages((m) => [
-//         ...m,
-//         { sender: "assistant", text: `Network error: ${e.message}` },
-//       ]);
-//     } finally {
-//       setSending(false);
-//     }
-//   };
-
-//   const onKeyDown = (e) => {
-//     if (e.key === "Enter" && !e.shiftKey) {
-//       e.preventDefault();
-//       sendMessage();
-//     }
-//   };
-
-//   if (loading) return <div>Loading...</div>;
-//   if (!isAuthenticated)
-//     return (
-//       <div>
-//         <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#083d44" }}>
-//           Layman Chat
-//         </h1>
-//         <p style={{ color: "#6b7280" }}>Please log in to start chatting.</p>
-//       </div>
-//     );
-
-//   return (
-//     <div>
-//       <h1
-//         style={{
-//           fontSize: "2.5rem",
-//           fontWeight: "700",
-//           color: "#083d44",
-//           marginBottom: "16px",
-//           fontFamily: "Poppins, sans-serif",
-//         }}
-//       >
-//         Layman Chat
-//       </h1>
-
-//       <div
-//         style={{
-//           display: "flex",
-//           flexDirection: "column",
-//           height: "70vh",
-//           border: "1px solid #e5e7eb",
-//           borderRadius: 12,
-//           overflow: "hidden",
-//           background: "#fff",
-//         }}
-//       >
-//         <div
-//           ref={listRef}
-//           style={{
-//             flex: 1,
-//             padding: 16,
-//             overflowY: "auto",
-//             background: "#f9fafb",
-//           }}
-//         >
-//           {messages.length === 0 ? (
-//             <div style={{ color: "#6b7280" }}>
-//               Start the conversation with your project idea or context.
-//             </div>
-//           ) : (
-//             messages.map((m, idx) => (
-//               <div
-//                 key={idx}
-//                 style={{
-//                   display: "flex",
-//                   justifyContent: m.sender === "user" ? "flex-end" : "flex-start",
-//                   marginBottom: 8,
-//                 }}
-//               >
-//                 <div
-//                   style={{
-//                     maxWidth: "75%",
-//                     padding: "10px 14px",
-//                     borderRadius: 12,
-//                     background: m.sender === "user" ? "#10b981" : "#e5e7eb",
-//                     color: m.sender === "user" ? "white" : "#111827",
-//                     whiteSpace: "pre-wrap",
-//                   }}
-//                 >
-//                   {m.text}
-//                 </div>
-//               </div>
-//             ))
-//           )}
-//         </div>
-//         <div style={{ display: "flex", gap: 8, padding: 12, borderTop: "1px solid #e5e7eb" }}>
-//           <textarea
-//             value={input}
-//             onChange={(e) => setInput(e.target.value)}
-//             onKeyDown={onKeyDown}
-//             placeholder="Type your message..."
-//             style={{
-//               flex: 1,
-//               resize: "none",
-//               height: 56,
-//               borderRadius: 10,
-//               border: "1px solid #d1d5db",
-//               padding: 12,
-//             }}
-//           />
-//           <button
-//             onClick={sendMessage}
-//             disabled={sending || !input.trim()}
-//             style={{
-//               background: sending ? "#9ca3af" : "#10b981",
-//               color: "white",
-//               padding: "0 18px",
-//               borderRadius: 10,
-//               border: "none",
-//               fontWeight: 600,
-//             }}
-//           >
-//             {sending ? "Sending..." : "Send"}
-//           </button>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
