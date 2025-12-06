@@ -98,12 +98,19 @@ export function ChatInterface({ onClose }) {
     try {
       const url = new URL(`${API_BASE}/chat/sessions`);
       url.searchParams.set('user_id', userId);
+      console.log('Fetching sessions from:', url.toString());
+      
       const res = await fetch(url.toString());
+      console.log('Sessions response status:', res.status);
+      
       if (!res.ok) {
+        console.error('Failed to fetch sessions:', res.status, res.statusText);
         setSessions([]);
         return;
       }
+      
       const data = await res.json();
+      console.log('Sessions data:', data);
       setSessions(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error fetching sessions', err);
@@ -302,22 +309,93 @@ export function ChatInterface({ onClose }) {
   const handleGenerateRoadmap = () => {
     const summary = latestAiMessage();
     if (!summary) return;
-    const lines = sanitizeSummaryLines(summary);
-    const pdf = buildSimplePdf('Roadmap Input', lines);
-    triggerDownload(pdf, 'roadmap_input.pdf');
-    setMessages((m) => [
-      ...m,
-      {
-        id: `roadmap-${Date.now()}`,
-        sender: 'ai',
-        text: 'Roadmap request noted. Downloaded roadmap_input.pdf can be uploaded to the roadmap generator.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ]);
+
+    // Create a proper PDF file using jsPDF
+    try {
+      const jsPDF = require('jspdf').jsPDF;
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.text('Roadmap Input Summary', margin, margin + 10);
+      
+      // Add content with word wrapping
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(summary, maxWidth);
+      let yPosition = margin + 25;
+      
+      lines.forEach((line) => {
+        if (yPosition > pageHeight - margin) {
+          doc.addPage();
+          yPosition = margin;
+        }
+        doc.text(line, margin, yPosition);
+        yPosition += 7;
+      });
+      
+      // Get the PDF as a data URL (base64)
+      const pdfDataUrl = doc.output('dataurlstring');
+      
+      // Store in sessionStorage
+      sessionStorage.setItem('roadmap_pdf', pdfDataUrl);
+      sessionStorage.setItem('roadmap_filename', 'roadmap_summary.pdf');
+      
+      // Redirect to roadmap page which will auto-generate
+      window.location.href = '/Roadmap?auto=true';
+    } catch (error) {
+      console.error('Error creating PDF:', error);
+      alert('Error preparing roadmap. Please try again.');
+    }
   };
 
   const handleFeasibility = () => {
-    window.alert('Feasibility analysis is pending. We will notify you once it is available.');
+    const summary = latestAiMessage();
+    if (!summary) return;
+
+    // Create a proper PDF file using jsPDF
+    try {
+      const jsPDF = require('jspdf').jsPDF;
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const maxWidth = pageWidth - 2 * margin;
+      
+      // Add title
+      doc.setFontSize(16);
+      doc.text('Research Summary', margin, margin + 10);
+      
+      // Add content with word wrapping
+      doc.setFontSize(11);
+      const lines = doc.splitTextToSize(summary, maxWidth);
+      let yPosition = margin + 25;
+      
+      lines.forEach((line) => {
+        if (yPosition > pageHeight - margin) {
+          doc.addPage();
+          yPosition = margin;
+        }
+        doc.text(line, margin, yPosition);
+        yPosition += 7;
+      });
+      
+      // Get the PDF as a data URL (base64)
+      const pdfDataUrl = doc.output('dataurlstring');
+      
+      // Store in sessionStorage
+      sessionStorage.setItem('feasibility_pdf', pdfDataUrl);
+      sessionStorage.setItem('feasibility_filename', 'feasibility_summary.pdf');
+      
+      // Redirect to feasibility page which will auto-analyze
+      window.location.href = '/feasibility?auto=true';
+    } catch (error) {
+      console.error('Error creating PDF:', error);
+      alert('Error preparing feasibility analysis. Please try again.');
+    }
   };
 
   // Note: auth loading removed for local/testing convenience.
@@ -387,8 +465,8 @@ export function ChatInterface({ onClose }) {
               <button type="button" className="new-chat-btn action-button" onClick={handleGenerateRoadmap}>
                 Get Roadmap
               </button>
-              <button type="button" className="new-chat-btn action-button orange" onClick={handleFeasibility} style={{ background: 'rgba(249, 115, 22, 0.3)' }}>
-                Feasibility (Pending)
+              <button type="button" className="new-chat-btn action-button" onClick={handleFeasibility} style={{ background: 'rgba(249, 115, 22, 0.3)' }}>
+                Analyze Feasibility
               </button>
             </div>
           ) : null}

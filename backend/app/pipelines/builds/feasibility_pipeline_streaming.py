@@ -34,40 +34,56 @@ def run_feasibility_assessment_streaming(
         key_topics=key_topics or [],
     )
     
+    total_stages = 6
+    current_stage = 0
+    
     try:
         # Stage 1: Technical Feasibility
-        yield f"data: {json.dumps({'stage': 'technical', 'status': 'in_progress', 'message': 'Assessing technical feasibility...'})}\n\n"
+        current_stage = 1
+        print("[Feasibility Streaming] Assessing technical feasibility...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Assessing technical feasibility...'})}\n\n"
         state = assess_technical_feasibility_node(state)
         if state.technical_feasibility:
-            yield f"data: {json.dumps({'stage': 'technical', 'status': 'complete', 'score': state.technical_feasibility.score})}\n\n"
+            print(f"[Feasibility Streaming] Technical feasibility score: {state.technical_feasibility.score}")
         
         # Stage 2: Resource Feasibility
-        yield f"data: {json.dumps({'stage': 'resource', 'status': 'in_progress', 'message': 'Assessing resource feasibility...'})}\n\n"
+        current_stage = 2
+        print("[Feasibility Streaming] Assessing resource feasibility...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Assessing resource feasibility...'})}\n\n"
         state = assess_resource_feasibility_node(state)
         if state.resource_feasibility:
-            yield f"data: {json.dumps({'stage': 'resource', 'status': 'complete', 'score': state.resource_feasibility.score})}\n\n"
+            print(f"[Feasibility Streaming] Resource feasibility score: {state.resource_feasibility.score}")
         
         # Stage 3: Skills Feasibility
-        yield f"data: {json.dumps({'stage': 'skills', 'status': 'in_progress', 'message': 'Assessing skills feasibility...'})}\n\n"
+        current_stage = 3
+        print("[Feasibility Streaming] Assessing skills feasibility...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Assessing skills feasibility...'})}\n\n"
         state = assess_skills_feasibility_node(state)
         if state.skills_feasibility:
-            yield f"data: {json.dumps({'stage': 'skills', 'status': 'complete', 'score': state.skills_feasibility.score})}\n\n"
+            print(f"[Feasibility Streaming] Skills feasibility score: {state.skills_feasibility.score}")
         
         # Stage 4: Scope Feasibility
-        yield f"data: {json.dumps({'stage': 'scope', 'status': 'in_progress', 'message': 'Assessing scope feasibility...'})}\n\n"
+        current_stage = 4
+        print("[Feasibility Streaming] Assessing scope feasibility...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Assessing scope feasibility...'})}\n\n"
         state = assess_scope_feasibility_node(state)
         if state.scope_feasibility:
-            yield f"data: {json.dumps({'stage': 'scope', 'status': 'complete', 'score': state.scope_feasibility.score})}\n\n"
+            print(f"[Feasibility Streaming] Scope feasibility score: {state.scope_feasibility.score}")
         
         # Stage 5: Risk Feasibility
-        yield f"data: {json.dumps({'stage': 'risk', 'status': 'in_progress', 'message': 'Assessing risk feasibility...'})}\n\n"
+        current_stage = 5
+        print("[Feasibility Streaming] Assessing risk feasibility...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Assessing risk feasibility...'})}\n\n"
         state = assess_risk_feasibility_node(state)
         if state.risk_feasibility:
-            yield f"data: {json.dumps({'stage': 'risk', 'status': 'complete', 'score': state.risk_feasibility.score})}\n\n"
+            print(f"[Feasibility Streaming] Risk feasibility score: {state.risk_feasibility.score}")
         
         # Stage 6: Generate Report
-        yield f"data: {json.dumps({'stage': 'report', 'status': 'in_progress', 'message': 'Generating final report...'})}\n\n"
+        current_stage = 6
+        print("[Feasibility Streaming] Generating final report...")
+        yield f"event: status\ndata: {json.dumps({'progress': int((current_stage / total_stages) * 100), 'message': 'Generating final report...'})}\n\n"
         state = generate_feasibility_report_node(state)
+        print("[Feasibility Streaming] Final report generated")
         
         # Collect sub-scores
         sub_scores = {}
@@ -95,17 +111,16 @@ def run_feasibility_assessment_streaming(
         if state.risk_feasibility and state.risk_feasibility.recommendation:
             recommendations.append(state.risk_feasibility.recommendation)
         
-        # Final result
+        # Final result with complete event
         result = {
-            "stage": "complete",
-            "status": "success",
             "final_score": state.final_score or 50,
             "sub_scores": sub_scores,
             "explanation": state.overall_explanation,
             "recommendations": recommendations,
             "detailed_report": state.final_report,
         }
-        yield f"data: {json.dumps(result)}\n\n"
+        print("[Feasibility Streaming] Sending final result...")
+        yield f"event: complete\ndata: {json.dumps(result)}\n\n"
         
     except Exception as e:
         print(f"[Feasibility Streaming] Error: {str(e)}")
