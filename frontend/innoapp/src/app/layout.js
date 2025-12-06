@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from './contexts/AuthContext';
-import AppShell from './components/AppShell';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -24,17 +23,19 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         style={{ 
-          backgroundColor: '#ffffff', 
+          backgroundColor: '#f8faf9', 
           fontFamily: 'Poppins, sans-serif',
           margin: 0,
-          padding: 0
+          padding: 0,
+          minHeight: '100vh'
         }}
       >
         <AuthProvider>
-          {/* AppShell decides whether to show SideNav (it hides on /auth routes) */}
-          <AppShell>
-            {children}
-          </AppShell>
+          <div style={{ display: 'block', padding: 0 }}>
+            <div style={{ width: '100%' }}>
+              {children}
+            </div>
+          </div>
         </AuthProvider>
       </body>
     </html>

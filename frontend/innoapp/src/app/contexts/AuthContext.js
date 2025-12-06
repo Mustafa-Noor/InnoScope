@@ -7,12 +7,25 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const DUMMY_TOKEN = 'dummy-local-token';
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
+        // If no token found, inject a dummy token and dummy user for local development/testing.
+        // This makes the app behave as if a user is already logged in.
         if (!token) {
+          const DUMMY_TOKEN = 'dummy-local-token';
+          const DUMMY_USER = { id: 'local-user', email: 'local@dev', first_name: 'Local', last_name: 'Tester', name: 'Local Tester' };
+          try {
+            localStorage.setItem('token', DUMMY_TOKEN);
+            // persist dummy user so other components (chat) can read the id
+            localStorage.setItem('user', JSON.stringify(DUMMY_USER));
+            setUser(DUMMY_USER);
+          } catch (e) {
+            console.warn('Unable to write dummy token to localStorage', e);
+          }
           setLoading(false);
           return;
         }
@@ -41,20 +54,15 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     try {
-      // Use OAuth2 password flow to match backend /auth/token
-      const form = new URLSearchParams();
-      form.append('username', email);
-      form.append('password', password);
-
-      const res = await fetch(`${API_BASE}/auth/token`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: form.toString(),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json();
 
-      if (!res.ok || !data?.access_token) {
+      if (!res.ok) {
         return { success: false, error: data?.detail || 'Login failed' };
       }
 
@@ -65,8 +73,9 @@ export function AuthProvider({ children }) {
       const meRes = await fetch(`${API_BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
-      const userData = await meRes.json().catch(() => null);
-      if (meRes.ok && userData) setUser(userData);
+      const userData = await meRes.json();
+      setUser(userData);
+      try { localStorage.setItem('user', JSON.stringify(userData)); } catch (e) { /* ignore */ }
 
       return { success: true };
     } catch (error) {
@@ -111,13 +120,25 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('token');
+    try { localStorage.removeItem('user'); } catch (e) { /* ignore */ }
   };
 
   // helper to attach auth header automatically
   const authFetch = async (url, opts = {}) => {
-    const token = localStorage.getItem('token');
-    const headers = { ...(opts.headers || {}) };
-    if (token) headers.Authorization = `Bearer ${token}`;
+    // Ensure we always send an Authorization header. If no real token is present,
+    // fall back to a dummy token that the backend accepts in development/local.
+    let token = localStorage.getItem('token');
+    if (!token) {
+      token = DUMMY_TOKEN;
+      try {
+        // persist fallback token so subsequent requests remain consistent
+        localStorage.setItem('token', token);
+      } catch (e) {
+        // ignore storage errors (e.g., privacy modes)
+      }
+    }
+
+    const headers = { ...(opts.headers || {}), Authorization: `Bearer ${token}` };
     const res = await fetch(url, { ...opts, headers });
     return res;
   };

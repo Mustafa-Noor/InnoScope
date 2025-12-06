@@ -17,20 +17,23 @@ async def handle_chat(
     background_tasks: BackgroundTasks
 ) -> ChatResponse:
     
+    # Use default user_id=1 if no current_user (unauthenticated access)
+    user_id = current_user.id if current_user else 1
+    
     # 1. Get or create chat session
     # Treat missing, null, or non-positive session_id as a new session
     if request.session_id and request.session_id > 0:
         result = await db.execute(
             select(ChatSession).where(
                 ChatSession.id == request.session_id,
-                ChatSession.user_id == current_user.id
+                ChatSession.user_id == user_id
             )
         )
         session = result.scalar_one_or_none()
         if not session:
             # If client passed an invalid id, create a fresh session instead of 404
             session = ChatSession(
-                user_id=current_user.id,
+                user_id=user_id,
                 topic=request.topic,
                 title=request.message[:50]
             )
@@ -39,7 +42,7 @@ async def handle_chat(
             await db.refresh(session)
     else:
         session = ChatSession(
-            user_id=current_user.id,
+            user_id=user_id,
             topic=request.topic,
             title=request.message[:50]
         )
