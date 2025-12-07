@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from app.schemas.feasibility import FeasibilityRequest, FeasibilityReport
 from app.pipelines.builds.feasibility_pipeline import run_feasibility_assessment
 from app.pipelines.builds.feasibility_pipeline_streaming import run_feasibility_assessment_streaming
-from app.pipelines.builds.roadmap_pipeline import run_roadmap_pipeline
+from app.pipelines.builds.feasibility_pipeline_from_document import run_feasibility_from_document
+from app.pipelines.builds.feasibility_pipeline_from_document_streaming import run_feasibility_from_document_streaming
+from app.models.chat import ChatSessionState
+from app.database import get_db
 import logging
 import tempfile
 import os
@@ -85,19 +90,185 @@ async def assess_project_feasibility(
         )
 
 
-@router.post("/generate")
+@router.post("/from-chat/{session_id}", response_model=FeasibilityReport)
+async def assess_feasibility_from_chat(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Assess feasibility continuing from a chat session's refined summary.
+    
+    Args:
+        session_id: The chat session ID to retrieve refined summary from
+        db: Database session
+        
+    Returns:
+        FeasibilityReport with feasibility assessment based on chat summary
+    """
+    logger.info(f"Feasibility assessment requested from chat session {session_id}")
+    
+    try:
+        # Retrieve chat session state
+        result = await db.execute(
+            select(ChatSessionState).where(ChatSessionState.session_id == session_id)
+        )
+        session_state = result.scalar_one_or_none()
+        
+        if not session_state:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chat session {session_id} not found or has no refined summary"
+            )
+        
+        # Extract refined summary and structured fields from chat session
+        refined_summary = session_state.refined_summary or session_state.initial_summary
+        if not refined_summary:
+            raise HTTPException(
+                status_code=400,
+                detail="No refined summary available in chat session"
+            )
+        
+        logger.info(f"Retrieved refined summary from chat session {session_id}")
+        
+        # Run feasibility assessment with chat-derived data
+        assessment_result = run_feasibility_assessment(
+            refined_summary=refined_summary,
+            problem_statement=session_state.problem_statement,
+            domain=session_state.domain,
+            goals=session_state.goals,
+            prerequisites=session_state.prerequisites,
+            key_topics=session_state.key_topics,
+        )
+        
+        # Collect sub-scores
+        sub_scores = {}
+        if assessment_result.technical_feasibility:
+            sub_scores["technical"] = assessment_result.technical_feasibility.score
+        if assessment_result.resource_feasibility:
+            sub_scores["resources"] = assessment_result.resource_feasibility.score
+        if assessment_result.skills_feasibility:
+            sub_scores["skills"] = assessment_result.skills_feasibility.score
+        if assessment_result.scope_feasibility:
+            sub_scores["scope"] = assessment_result.scope_feasibility.score
+        if assessment_result.risk_feasibility:
+            sub_scores["risk"] = assessment_result.risk_feasibility.score
+        
+        # Collect recommendations
+        recommendations = []
+        if assessment_result.technical_feasibility and assessment_result.technical_feasibility.recommendation:
+            recommendations.append(assessment_result.technical_feasibility.recommendation)
+        if assessment_result.resource_feasibility and assessment_result.resource_feasibility.recommendation:
+            recommendations.append(assessment_result.resource_feasibility.recommendation)
+        if assessment_result.skills_feasibility and assessment_result.skills_feasibility.recommendation:
+            recommendations.append(assessment_result.skills_feasibility.recommendation)
+        if assessment_result.scope_feasibility and assessment_result.scope_feasibility.recommendation:
+            recommendations.append(assessment_result.scope_feasibility.recommendation)
+        if assessment_result.risk_feasibility and assessment_result.risk_feasibility.recommendation:
+            recommendations.append(assessment_result.risk_feasibility.recommendation)
+        
+        return FeasibilityReport(
+            final_score=assessment_result.final_score or 50,
+            sub_scores=sub_scores,
+            explanation=assessment_result.overall_explanation or "Assessment complete.",
+            recommendations=recommendations,
+            detailed_report=assessment_result.final_report or "No detailed report available.",
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error during feasibility assessment from chat: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Feasibility assessment failed: {str(e)}"
+        )
+
+
+@router.post("/from-chat/{session_id}/stream")
+async def assess_feasibility_from_chat_stream(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Assess feasibility from chat session with real-time streaming progress.
+    
+    Args:
+        session_id: The chat session ID to retrieve refined summary from
+        db: Database session
+        
+    Returns:
+        Server-sent events stream with assessment progress and final report
+    """
+    logger.info(f"Feasibility streaming assessment requested from chat session {session_id}")
+    
+    try:
+        # Retrieve chat session state
+        result = await db.execute(
+            select(ChatSessionState).where(ChatSessionState.session_id == session_id)
+        )
+        session_state = result.scalar_one_or_none()
+        
+        if not session_state:
+            async def error_generator():
+                yield f"data: {{\"stage\": \"error\", \"message\": \"Chat session not found\"}}\n\n"
+            return StreamingResponse(error_generator(), media_type="text/event-stream")
+        
+        refined_summary = session_state.refined_summary or session_state.initial_summary
+        if not refined_summary:
+            async def error_generator():
+                yield f"data: {{\"stage\": \"error\", \"message\": \"No refined summary available\"}}\n\n"
+            return StreamingResponse(error_generator(), media_type="text/event-stream")
+        
+        async def event_generator():
+            try:
+                logger.info(f"Starting feasibility assessment stream for session {session_id}")
+                yield f"data: {{\"stage\": \"starting\", \"message\": \"Starting feasibility assessment...\"}}\n\n"
+                
+                # Stream feasibility assessment
+                for event in run_feasibility_assessment_streaming(
+                    refined_summary=refined_summary,
+                    problem_statement=session_state.problem_statement,
+                    domain=session_state.domain,
+                    goals=session_state.goals,
+                    prerequisites=session_state.prerequisites,
+                    key_topics=session_state.key_topics,
+                ):
+                    yield event
+                
+                # Emit final completion
+                yield f"data: {{\"stage\": \"complete\"}}\n\n"
+                    
+            except Exception as e:
+                logger.error(f"Stream error: {str(e)}", exc_info=True)
+                yield f"data: {{\"stage\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+        
+    except Exception as e:
+        logger.error(f"Feasibility stream error: {str(e)}", exc_info=True)
+        async def error_generator():
+            yield f"data: {{\"stage\": \"error\", \"message\": \"Error: {str(e)}\"}}\n\n"
+        return StreamingResponse(error_generator(), media_type="text/event-stream")
+
+
+@router.post("/generate", response_model=FeasibilityReport)
 async def generate_feasibility_from_file(
     file: UploadFile = File(...),
 ):
     """
-    Upload a document, generate roadmap with summary, then assess feasibility.
-    Similar to roadmap endpoint but includes feasibility assessment.
+    Upload a document and assess feasibility.
+    
+    Flow: scoping -> feasibility
     
     Args:
         file: Uploaded document file (PDF or DOCX)
         
     Returns:
-        dict: Contains roadmap output plus feasibility assessment
+        FeasibilityReport with feasibility assessment results
     """
     logger.info("Feasibility generation from file requested")
     
@@ -118,50 +289,46 @@ async def generate_feasibility_from_file(
             temp_file.write(content)
             temp_file_path = temp_file.name
         
-        # Step 1: Run roadmap pipeline to get refined summary and structured fields
-        logger.info("Step 1: Running roadmap pipeline to extract summary and fields...")
-        roadmap_output = run_roadmap_pipeline(temp_file_path)
+        # Run feasibility pipeline from document (scoping + feasibility)
+        logger.info("Running document analysis and feasibility assessment...")
+        result = run_feasibility_from_document(temp_file_path)
         
-        if roadmap_output.status != "success":
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to generate roadmap: {roadmap_output.message}"
-            )
+        # Clean up temporary file
+        os.unlink(temp_file_path)
         
-        # Step 2: Run feasibility assessment with extracted data
-        logger.info("Step 2: Running feasibility assessment...")
-        assessment_result = run_feasibility_assessment(
-            refined_summary=roadmap_output.refined_summary or roadmap_output.initial_summary or "",
-            problem_statement=None,  # Could be extracted from summary if needed
-            domain=None,
-            goals=None,
-            prerequisites=None,
-            key_topics=None,
+        # Collect sub-scores
+        sub_scores = {}
+        if result.technical_feasibility:
+            sub_scores["technical"] = result.technical_feasibility.score
+        if result.resource_feasibility:
+            sub_scores["resources"] = result.resource_feasibility.score
+        if result.skills_feasibility:
+            sub_scores["skills"] = result.skills_feasibility.score
+        if result.scope_feasibility:
+            sub_scores["scope"] = result.scope_feasibility.score
+        if result.risk_feasibility:
+            sub_scores["risk"] = result.risk_feasibility.score
+        
+        # Collect recommendations
+        recommendations = []
+        if result.technical_feasibility and result.technical_feasibility.recommendation:
+            recommendations.append(result.technical_feasibility.recommendation)
+        if result.resource_feasibility and result.resource_feasibility.recommendation:
+            recommendations.append(result.resource_feasibility.recommendation)
+        if result.skills_feasibility and result.skills_feasibility.recommendation:
+            recommendations.append(result.skills_feasibility.recommendation)
+        if result.scope_feasibility and result.scope_feasibility.recommendation:
+            recommendations.append(result.scope_feasibility.recommendation)
+        if result.risk_feasibility and result.risk_feasibility.recommendation:
+            recommendations.append(result.risk_feasibility.recommendation)
+        
+        return FeasibilityReport(
+            final_score=result.final_score or 50,
+            sub_scores=sub_scores,
+            explanation=result.overall_explanation or "Assessment complete.",
+            recommendations=recommendations,
+            detailed_report=result.final_report or "No detailed report available.",
         )
-        
-        # Collect feasibility sub-scores
-        feasibility_scores = {}
-        if assessment_result.technical_feasibility:
-            feasibility_scores["technical"] = assessment_result.technical_feasibility.score
-        if assessment_result.resource_feasibility:
-            feasibility_scores["resources"] = assessment_result.resource_feasibility.score
-        if assessment_result.skills_feasibility:
-            feasibility_scores["skills"] = assessment_result.skills_feasibility.score
-        if assessment_result.scope_feasibility:
-            feasibility_scores["scope"] = assessment_result.scope_feasibility.score
-        if assessment_result.risk_feasibility:
-            feasibility_scores["risk"] = assessment_result.risk_feasibility.score
-        
-        # Return combined result
-        return {
-            "success": True,
-            "roadmap": roadmap_output.roadmap,
-            "initial_summary": roadmap_output.initial_summary,
-            "refined_summary": roadmap_output.refined_summary,
-            "feasibility_score": assessment_result.final_score or 50,
-            "feasibility_sub_scores": feasibility_scores,
-            "feasibility_report": assessment_result.final_report,
-        }
         
     except HTTPException:
         raise
@@ -182,6 +349,7 @@ async def generate_feasibility_stream(
 ):
     """
     Upload a document and assess feasibility with real-time status streaming.
+    Streams assessment progress updates via Server-Sent Events.
     
     Args:
         file: Uploaded document file (PDF or DOCX)
@@ -205,25 +373,15 @@ async def generate_feasibility_stream(
 
         async def event_generator():
             try:
-                # Extract data from document via roadmap pipeline
-                logger.info("Extracting document data...")
-                roadmap_output = run_roadmap_pipeline(temp_file_path)
+                # Run feasibility from document with streaming
+                logger.info("Starting feasibility assessment stream from document...")
                 
-                if roadmap_output.status != "success":
-                    yield f"data: {{\"stage\": \"error\", \"status\": \"error\", \"message\": \"Failed to extract document data\"}}\n\n"
-                    return
-                
-                refined_summary = roadmap_output.refined_summary or roadmap_output.initial_summary or ""
-                
-                # Stream feasibility assessment
-                for event in run_feasibility_assessment_streaming(
-                    refined_summary=refined_summary,
-                ):
+                for event in run_feasibility_from_document_streaming(temp_file_path):
                     yield event
                     
             except Exception as e:
-                logger.error(f"Stream error: {str(e)}")
-                yield f"data: {{\"stage\": \"error\", \"status\": \"error\", \"message\": \"{str(e)}\"}}\n\n"
+                logger.error(f"Stream error: {str(e)}", exc_info=True)
+                yield f"data: {{\"stage\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"
             finally:
                 if temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
@@ -239,5 +397,5 @@ async def generate_feasibility_stream(
     except Exception as e:
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
-        logger.error(f"Feasibility stream error: {str(e)}")
+        logger.error(f"Feasibility stream error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

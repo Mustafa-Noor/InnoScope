@@ -113,7 +113,7 @@ def run_feasibility_assessment_streaming(
         
         # Final result with complete event
         result = {
-            "final_score": state.final_score or 50,
+            "final_score": state.final_score,
             "sub_scores": sub_scores,
             "explanation": state.overall_explanation,
             "recommendations": recommendations,

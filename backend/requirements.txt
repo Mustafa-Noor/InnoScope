@@ -3,6 +3,7 @@ uvicorn
 pydantic
 dotenv
 tavily-python
+huggingface_hub
 google-generativeai
 langgraph
 python-docx 

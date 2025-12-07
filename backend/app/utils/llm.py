@@ -26,7 +26,7 @@ def call_llm(prompt: str) -> str:
         return f"Error: {str(e)}"
 
 
-# if __name__ == "__main__":
-#     prompt = "Explain the theory of relativity in simple terms. Write one paragraph."
-#     result = call_llm(prompt)
-#     print(result)
+if __name__ == "__main__":
+    prompt = "Explain the theory of relativity in simple terms. Write one paragraph."
+    result = call_llm(prompt)
+    print(result)

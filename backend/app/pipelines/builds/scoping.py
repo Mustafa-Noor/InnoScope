@@ -4,7 +4,6 @@ from app.pipelines.nodes.extract_text import extract_text_node
 from app.pipelines.nodes.check_research import check_research_node
 from app.pipelines.nodes.summarize import summarize_node
 from app.pipelines.nodes.fill_state import fill_state_node
-from app.pipelines.nodes.refine_summary import refine_summary_node
 
 
 def _extract_text_dbg(state: IntermediateState) -> IntermediateState:
@@ -46,27 +45,16 @@ def _fill_state_dbg(state: IntermediateState) -> IntermediateState:
     return state
 
 
-def _refine_summary_dbg(state: IntermediateState) -> IntermediateState:
-    print("[Scoping] >> refine_summary: refining summary with structured context")
-    before_len = len(state.summary) if state.summary else 0
-    state = refine_summary_node(state)
-    after_len = len(state.summary) if state.summary else 0
-    print(f"[Scoping] << refine_summary: summary_len {before_len} -> {after_len}")
-    return state
-
-
 def create_graph():
     graph = StateGraph(IntermediateState)
     graph.add_node("extract_text", _extract_text_dbg)
     graph.add_node("check_research", _check_research_dbg)
     graph.add_node("summarize", _summarize_dbg)
     graph.add_node("fill_state", _fill_state_dbg)
-    graph.add_node("refine_summary", _refine_summary_dbg)
 
     graph.set_entry_point("extract_text")
     graph.add_edge("extract_text", "check_research")
     graph.add_edge("check_research", "summarize")
     graph.add_edge("summarize", "fill_state")
-    graph.add_edge("fill_state", "refine_summary")
-    graph.add_edge("refine_summary", END)
+    graph.add_edge("fill_state", END)
     return graph.compile()
