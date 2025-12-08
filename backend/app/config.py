@@ -8,5 +8,6 @@ class Settings:
     TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
     Database_URL: str = os.getenv("DATABASE_URL")
     Secret_Key: str = os.getenv("SECRET_KEY")
+    Hf_Token: str = os.getenv("HF_TOKEN")
 
 settings = Settings()

@@ -1,10 +1,18 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Query
 from app.pipelines.builds.roadmap_pipeline import run_roadmap_pipeline
+from app.pipelines.builds.roadmap_pipeline_from_chat import run_roadmap_from_chat
+from app.pipelines.builds.roadmap_pipeline_streaming import run_roadmap_pipeline_streaming
 from fastapi import UploadFile, File
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from app.models.chat import ChatSessionState
+from app.database import get_db
 import tempfile
 import os
-from fastapi.responses import StreamingResponse
-from app.pipelines.builds.roadmap_pipeline_streaming import run_roadmap_pipeline_streaming
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/roadmap",
@@ -75,6 +83,59 @@ async def generate_roadmap(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Error processing document: {str(e)}")
 
 
+@router.post("/from-chat/{session_id}")
+async def generate_roadmap_from_chat(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Generate roadmap from a chat session's refined summary.
+    
+    Flow: chat_agent -> research -> roadmap
+    
+    Args:
+        session_id: The chat session ID
+        db: Database session
+        
+    Returns:
+        dict: Contains roadmap, refined_summary, and status
+    """
+    logger.info(f"Roadmap generation from chat session {session_id}")
+    
+    try:
+        # Retrieve chat session state
+        result = await db.execute(
+            select(ChatSessionState).where(ChatSessionState.session_id == session_id)
+        )
+        session_state = result.scalar_one_or_none()
+        
+        if not session_state:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Chat session {session_id} not found"
+            )
+        
+        # Get chat memory/context
+        memory_text = session_state.memory or ""
+        
+        # Run roadmap pipeline from chat
+        result = run_roadmap_from_chat(memory_text=memory_text)
+        
+        return {
+            "success": True,
+            "message": "Roadmap generated from chat",
+            "refined_summary": result.summary,
+            "roadmap": result.roadmap,
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating roadmap from chat: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating roadmap: {str(e)}"
+        )
 
 
 @router.post('/generate-stream')

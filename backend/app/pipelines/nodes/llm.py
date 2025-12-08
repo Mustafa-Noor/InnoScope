@@ -61,24 +61,36 @@ def _safe_json_extract(raw: str) -> dict:
 
 
 def _decide_source(state: ResearchState) -> tuple[Literal["wiki", "ddg"], str]:
+	"""Use heuristic routing instead of LLM to save tokens.
+	
+	Routes to:
+	- wiki: Academic/technical domains, single focused goal
+	- ddg: Business/market domains, multiple diverse goals
+	"""
 	interm = state.intermediate
-	summary = (interm.summary or "")
-	prompt = (
-		f"{DECISION_INSTRUCTIONS}\n\n"  # instructions
-		f"Domain: {interm.domain}\n"
-		f"Problem: {interm.problem_statement}\n"
-		f"Goals: {', '.join(interm.goals or [])}\n"
-		f"Prerequisites: {', '.join(interm.prerequisites or [])}\n"
-		f"Key Topics: {', '.join(interm.key_topics or [])}\n"
-		f"Summary: {summary}\n"
-	)
-	raw = call_llm(prompt)
-	data = _safe_json_extract(raw)
-	source = data.get("source", "wiki")
-	if source not in {"wiki", "ddg"}:
-		source = "wiki"
-	reason = data.get("reason", "LLM defaulted to wiki.")
-	return source, reason
+	domain = (interm.domain or "").lower()
+	goals = interm.goals or []
+	
+	# Heuristic: Check domain keywords
+	academic_keywords = ["research", "academic", "science", "technology", "engineering", "medical", "computer", "physics", "chemistry", "biology"]
+	business_keywords = ["business", "market", "startup", "finance", "sales", "marketing", "commerce", "industry", "trend"]
+	
+	domain_is_academic = any(kw in domain for kw in academic_keywords)
+	domain_is_business = any(kw in domain for kw in business_keywords)
+	
+	# Routes to wiki if:
+	# - Academic domain with 1-2 focused goals, OR
+	# - Domain is not explicitly business-oriented
+	if domain_is_academic and len(goals) <= 2:
+		return "wiki", "Academic domain with focused scope, using Wiki for depth"
+	elif domain_is_business or len(goals) >= 3:
+		return "ddg", "Business/market domain or multiple goals, using DDG for breadth"
+	else:
+		# Default based on goal diversity
+		if len(goals) >= 2:
+			return "ddg", "Multiple goals require broad source coverage"
+		else:
+			return "wiki", "Single focused goal, using Wiki for authoritative context"
 
 
 def _arrange_report(state: ResearchState, source_choice: str, reason: str) -> str:
