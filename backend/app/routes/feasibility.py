@@ -362,10 +362,10 @@ async def generate_feasibility_stream(
     
     if file_extension not in allowed_extensions:
         raise HTTPException(status_code=400, detail="Unsupported file type")
-    
+
     temp_file_path = None
-    
     try:
+        # Save file
         with tempfile.NamedTemporaryFile(delete=False, suffix=file_extension) as temp_file:
             content = await file.read()
             temp_file.write(content)
@@ -373,15 +373,8 @@ async def generate_feasibility_stream(
 
         async def event_generator():
             try:
-                # Run feasibility from document with streaming
-                logger.info("Starting feasibility assessment stream from document...")
-                
                 for event in run_feasibility_from_document_streaming(temp_file_path):
                     yield event
-                    
-            except Exception as e:
-                logger.error(f"Stream error: {str(e)}", exc_info=True)
-                yield f"data: {{\"stage\": \"error\", \"message\": \"Stream error: {str(e)}\"}}\n\n"
             finally:
                 if temp_file_path and os.path.exists(temp_file_path):
                     os.unlink(temp_file_path)
@@ -392,10 +385,8 @@ async def generate_feasibility_stream(
             headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
         )
         
-    except HTTPException:
-        raise
     except Exception as e:
+        logger.error(f"Feasibility stream error: {str(e)}", exc_info=True)
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
-        logger.error(f"Feasibility stream error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

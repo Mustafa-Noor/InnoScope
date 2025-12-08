@@ -101,12 +101,14 @@ export default function FeasibilityPage() {
       const formData = new FormData();
       formData.append('file', file);
 
+      console.log('Starting feasibility analysis for file:', file.name);
       const res = await fetch(`${API_BASE}/feasibility/generate-stream`, {
         method: 'POST',
         body: formData,
       });
 
       if (!res.ok) {
+        console.error('Response not OK:', res.status, res.statusText);
         alert('Feasibility analysis failed. Please try again.');
         setIsAnalyzing(false);
         return;
@@ -116,45 +118,55 @@ export default function FeasibilityPage() {
       const decoder = new TextDecoder();
       let buffer = '';
       let finalData = null;
+      let eventCount = 0;
+      let lastEvent = null;
 
       while (true) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          console.log('Stream reading completed, received', eventCount, 'events');
+          console.log('Last event before completion:', lastEvent);
+          break;
+        }
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
 
-        // Process complete lines
+        // Process complete lines (split by empty line or by individual data: lines)
         for (let i = 0; i < lines.length - 1; i++) {
           const line = lines[i].trim();
           
-          // Look for event: line
-          if (line.startsWith('event:')) {
-            const eventType = line.replace('event:', '').trim();
+          // Skip empty lines
+          if (!line) continue;
+          
+          // Look for data: lines (SSE simple format)
+          if (line.startsWith('data:')) {
+            const dataLine = line.replace('data:', '').trim();
+            if (!dataLine) continue;
             
-            // Check if next line has data
-            if (i + 1 < lines.length && lines[i + 1].trim().startsWith('data:')) {
-              const dataLine = lines[i + 1].trim().replace('data:', '').trim();
-              try {
-                const eventData = JSON.parse(dataLine);
-                
-                // Update progress bar
-                if (eventData.progress !== undefined) {
-                  setCurrentProgress(eventData.progress);
-                }
-
-                // Update loading stages
-                if (eventData.message) {
-                  setLoadingStages(prev => [...prev, eventData.message]);
-                }
-
-                // Check if this is the complete event
-                if (eventType === 'complete') {
-                  finalData = eventData;
-                }
-              } catch (e) {
-                console.warn('Could not parse SSE data', dataLine, e);
+            try {
+              const eventData = JSON.parse(dataLine);
+              eventCount++;
+              lastEvent = eventData;
+              console.log('Event', eventCount, ':', eventData.stage || 'unknown', eventData);
+              
+              // Update progress bar
+              if (eventData.progress !== undefined) {
+                setCurrentProgress(eventData.progress);
               }
+
+              // Update loading stages
+              if (eventData.message) {
+                setLoadingStages(prev => [...prev, eventData.message]);
+              }
+
+              // Check if this is the complete event
+              if (eventData.stage === 'complete') {
+                finalData = eventData.result || eventData;
+                console.log('Complete event received with data:', finalData);
+              }
+            } catch (e) {
+              console.warn('Could not parse SSE data:', dataLine, 'Error:', e.message);
             }
           }
         }
@@ -163,6 +175,14 @@ export default function FeasibilityPage() {
         buffer = lines[lines.length - 1];
       }
 
+      console.log('Final data after streaming:', finalData);
+      
+      // If no explicit complete event was received, use the last event if it has result data
+      if (!finalData && lastEvent && lastEvent.result) {
+        console.log('Using last event result as final data:', lastEvent.result);
+        finalData = lastEvent.result;
+      }
+      
       if (finalData) {
         // Transform the response to match our FeasibilityData structure
         const transformedData = {
@@ -173,16 +193,18 @@ export default function FeasibilityPage() {
           detailed_report: finalData.detailed_report || finalData.feasibility_report || 'No detailed report available.'
         };
         
+        console.log('Transformed data:', transformedData);
         setFeasibilityData(transformedData);
         setToastMessage('Feasibility analysis completed');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3500);
       } else {
+        console.error('No final data received from stream');
         alert('No analysis data received. Please try again.');
       }
     } catch (e) {
-      console.error(e);
-      alert('Error analyzing feasibility.');
+      console.error('Error during feasibility analysis:', e);
+      alert('Error analyzing feasibility: ' + e.message);
     } finally {
       setIsAnalyzing(false);
     }

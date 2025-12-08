@@ -38,7 +38,6 @@ JSON:
         )
     except Exception as e:
         print(f"[Feasibility] Error parsing technical assessment: {e}")
-        raise
     
     return state
 
@@ -78,7 +77,6 @@ JSON:
         )
     except Exception as e:
         print(f"[Feasibility] Error parsing resource assessment: {e}")
-        raise
     
     return state
 
@@ -118,7 +116,6 @@ JSON:
         )
     except Exception as e:
         print(f"[Feasibility] Error parsing skills assessment: {e}")
-        raise
     
     return state
 
@@ -158,7 +155,6 @@ JSON:
         )
     except Exception as e:
         print(f"[Feasibility] Error parsing scope assessment: {e}")
-        raise
     
     return state
 
@@ -198,6 +194,5 @@ JSON:
         )
     except Exception as e:
         print(f"[Feasibility] Error parsing risk assessment: {e}")
-        raise
     
     return state

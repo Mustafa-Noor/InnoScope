@@ -45,8 +45,10 @@ def generate_feasibility_report_node(state):
     if state.risk_feasibility:
         scores_list.append(state.risk_feasibility.score)
     
-    avg_score = int(sum(scores_list) / len(scores_list)) if scores_list else None
+    avg_score = int(sum(scores_list) / len(scores_list)) if scores_list else 50
     state.final_score = avg_score
+    
+    print(f"[Feasibility] Calculated avg_score: {avg_score}, scores_list: {scores_list}")
     
     # Determine viability status based on score
     if avg_score >= 80:

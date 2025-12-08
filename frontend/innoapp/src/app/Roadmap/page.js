@@ -262,19 +262,19 @@ export default function RoadmapPage() {
     lines.forEach((line, index) => {
       const trimmedLine = line.trim();
       
-      // Check for main numbered sections (1. Prototype Development, 2. Testing & Validation, etc.)
-      const mainSectionMatch = trimmedLine.match(/^### (\d+)\.\s*(.+)$/);
+      // Check for main numbered sections - support both ### and # formats
+      const mainSectionMatch = trimmedLine.match(/^#+\s*(\d+)\.\s*(.+)$/) || trimmedLine.match(/^(\d+)\.\s+(.+)$/);
       if (mainSectionMatch) {
         // Save previous phase if exists
-        if (currentPhase) {
+        if (currentPhase && currentPhase.name) {
           phases.push(currentPhase);
         }
         
         // Start new phase
-        const phaseName = mainSectionMatch[2];
+        const phaseName = mainSectionMatch[2] || mainSectionMatch[1];
         currentPhase = {
           id: phaseCounter++,
-          name: phaseName,
+          name: phaseName.trim(),
           duration: 'To be determined',
           tasks: [],
           objective: ''
@@ -284,8 +284,8 @@ export default function RoadmapPage() {
       }
       
       // Check for objectives
-      if (trimmedLine.startsWith('**Objective:**')) {
-        const objective = trimmedLine.replace('**Objective:**', '').trim();
+      if (trimmedLine.startsWith('**Objective:**') || trimmedLine.startsWith('Objective:')) {
+        const objective = trimmedLine.replace(/^\*\*?Objective:\*\*?/, '').trim();
         if (currentPhase) {
           currentPhase.objective = objective;
           currentObjective = objective;
@@ -294,7 +294,7 @@ export default function RoadmapPage() {
       }
       
       // Check for action items with specific format (Action 1a, Action 2b, etc.)
-      const actionMatch = trimmedLine.match(/^\*\s+\*Action \d+[a-z]:\*\s*(.+)$/);
+      const actionMatch = trimmedLine.match(/^\*\s+\*Action \d+[a-z]:\*\s*(.+)$/) || trimmedLine.match(/^Action \d+[a-z]:\s*(.+)$/);
       if (actionMatch && currentPhase) {
         const actionDescription = actionMatch[1];
         currentPhase.tasks.push(actionDescription);
@@ -302,18 +302,18 @@ export default function RoadmapPage() {
       }
       
       // Check for general bullet points with actions
-      const bulletMatch = trimmedLine.match(/^\*\s+(.+)$/);
+      const bulletMatch = trimmedLine.match(/^\*\s+(.+)$/) || trimmedLine.match(/^[-•]\s+(.+)$/);
       if (bulletMatch && currentPhase && !trimmedLine.includes('Action')) {
         const task = bulletMatch[1];
-        // Only add meaningful tasks (longer than 15 characters and not just formatting)
-        if (task.length > 15 && !task.match(/^(Objective|Goal|Target):/)) {
-          currentPhase.tasks.push(task);
+        // Only add meaningful tasks (longer than 10 characters and not just formatting)
+        if (task.length > 10 && !task.match(/^(Objective|Goal|Target|Duration):/i)) {
+          currentPhase.tasks.push(task.replace(/^\*+/, '').replace(/\*+$/, ''));
         }
         return;
       }
       
       // Check for sub-bullet points (nested actions)
-      const subBulletMatch = trimmedLine.match(/^\s+\*\s+\*(.+?):\*\s*(.+)$/);
+      const subBulletMatch = trimmedLine.match(/^\s+\*\s+\*(.+?):\*\s*(.+)$/) || trimmedLine.match(/^\s+[-•]\s+(.+?):\s*(.+)$/);
       if (subBulletMatch && currentPhase) {
         const actionTitle = subBulletMatch[1];
         const actionDesc = subBulletMatch[2];
@@ -322,43 +322,48 @@ export default function RoadmapPage() {
       }
       
       // Fallback: check for any meaningful content that might be a task
-      if (currentPhase && trimmedLine.length > 20 && 
+      if (currentPhase && trimmedLine.length > 15 && 
           !trimmedLine.startsWith('**') && 
           !trimmedLine.startsWith('---') &&
           !trimmedLine.startsWith('#') &&
-          !trimmedLine.match(/^(As an expert|This roadmap|Objective)/)) {
+          !trimmedLine.match(/^(As an expert|This roadmap|Objective|Duration)/i)) {
         
         // Clean up the task text
-        let cleanTask = trimmedLine.replace(/^\*+\s*/, '').replace(/\*\*/g, '');
-        if (cleanTask.length > 15) {
+        let cleanTask = trimmedLine.replace(/^\*+\s*/, '').replace(/\*\*/g, '').replace(/[-•]\s+/, '');
+        if (cleanTask.length > 15 && cleanTask.split(' ').length > 2) {
           currentPhase.tasks.push(cleanTask);
         }
       }
     });
     
     // Add the last phase
-    if (currentPhase) {
+    if (currentPhase && currentPhase.name) {
       phases.push(currentPhase);
     }
     
     // If no phases were found with the specific format, try a simpler approach
     if (phases.length === 0) {
-      const simpleSections = roadmapText.split(/\n\n###?\s*\d+\.?\s*/);
+      const simpleSections = roadmapText.split(/\n\n#+?\s*\d+\.?\s+/);
       simpleSections.forEach((section, index) => {
         if (section.trim() && index > 0) {
           const lines = section.split('\n').filter(line => line.trim());
           if (lines.length > 0) {
             const title = lines[0].trim().replace(/\*+/g, '').replace(/#+/g, '');
-            const tasks = lines.slice(1).filter(line => line.trim().length > 15).map(line => 
+            const tasks = lines.slice(1).filter(line => {
+              const cleaned = line.trim().replace(/^\*+\s*/, '').replace(/\*\*/g, '');
+              return cleaned.length > 15 && !cleaned.match(/^(Objective|Duration):/i);
+            }).map(line => 
               line.trim().replace(/^\*+\s*/, '').replace(/\*\*/g, '')
             );
             
-            phases.push({
-              id: index,
-              name: title || `Phase ${index}`,
-              duration: 'To be determined',
-              tasks: tasks.slice(0, 8) // Limit to 8 tasks per phase for UI
-            });
+            if (title || tasks.length > 0) {
+              phases.push({
+                id: index,
+                name: title || `Phase ${index}`,
+                duration: 'To be determined',
+                tasks: tasks.slice(0, 12) // Limit to 12 tasks per phase for UI
+              });
+            }
           }
         }
       });

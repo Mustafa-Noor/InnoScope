@@ -14,9 +14,16 @@ def ddg_search(query: str) -> Dict:
         "no_redirect": "1",
         "no_html": "1",
     }
-    resp = requests.get(DDG_API, params=params, headers=HEADERS, timeout=20)
-    resp.raise_for_status()
-    return resp.json()
+    try:
+        resp = requests.get(DDG_API, params=params, headers=HEADERS, timeout=20)
+        resp.raise_for_status()
+        # Handle empty response body
+        if not resp.text:
+            return {}
+        return resp.json()
+    except (requests.exceptions.RequestException, ValueError) as e:
+        # If request fails or response isn't valid JSON, return empty dict
+        return {}
 
 
 def _extract_text_items(data: Dict) -> List[str]:

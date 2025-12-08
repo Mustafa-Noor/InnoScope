@@ -1,4 +1,6 @@
 from app.utils.llm import call_llm
+import json
+import re
 
 
 def summarize_research(text):
@@ -10,6 +12,62 @@ def summarize_research(text):
     """
     response = call_llm(prompt)
     return response
+
+
+def summarize_and_extract_fields(text: str):
+    """Combined LLM call to generate summary AND extract fields in one prompt.
+    
+    Returns tuple: (summary_text, fields_dict)
+    """
+    prompt = f"""You are an expert document analyst. Analyze the provided text and return ONLY valid JSON with this structure:
+
+{{
+    "summary": "A comprehensive summary with headings like Abstract, Introduction, Methodology, Results, Conclusion. Keep as much detail as possible.",
+    "problem_statement": "The main problem or research question",
+    "domain": "Field of study or industry",
+    "goals": ["Goal 1", "Goal 2", "Goal 3"],
+    "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
+    "prerequisites": ["Prerequisite 1", "Prerequisite 2"]
+}}
+
+Text to analyze:
+{text[:5000]}
+
+Return ONLY the JSON, no other text."""
+    
+    response = call_llm(prompt)
+    if not response:
+        return "", {}
+    
+    # Clean markdown code blocks
+    response = re.sub(r"^```(?:json)?\s*|\s*```$", "", response.strip(), flags=re.MULTILINE)
+    
+    # Extract JSON from response
+    json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response)
+    if json_match:
+        response = json_match.group(0)
+    
+    try:
+        data = json.loads(response)
+        summary = data.get("summary", "")
+        
+        # Convert summary to string if it's a dict (in case LLM returns formatted dict)
+        if isinstance(summary, dict):
+            summary = "\n".join([f"{k}: {v}" for k, v in summary.items()])
+        elif not isinstance(summary, str):
+            summary = str(summary)
+        
+        fields = {
+            "problem_statement": data.get("problem_statement", ""),
+            "domain": data.get("domain", ""),
+            "goals": data.get("goals", []),
+            "key_topics": data.get("key_topics", []),
+            "prerequisites": data.get("prerequisites", []),
+        }
+        return summary, fields
+    except json.JSONDecodeError:
+        return "", {}
+
 
 def refine_summary(previous_summary: str, state):
     prompt = f"""
