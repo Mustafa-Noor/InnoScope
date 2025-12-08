@@ -65,6 +65,9 @@ def generate_feasibility_report_node(state):
         summary = "This project faces significant feasibility challenges and requires substantial rethinking."
     
     # Generate compact deterministic report without LLM call to save quota
+    default_recommendations = "- Review project scope and objectives\n- Assess available resources and constraints\n- Evaluate team capabilities and expertise"
+    final_recommendations = recommendations_text if recommendations_text else default_recommendations
+    
     report = f"""FEASIBILITY ASSESSMENT REPORT
 {'='*50}
 
@@ -78,7 +81,7 @@ SUB-SCORES BREAKDOWN:
 {scores_text}
 
 KEY RECOMMENDATIONS:
-{recommendations_text if recommendations_text else "- Review project scope and objectives\\n- Assess available resources and constraints\\n- Evaluate team capabilities and expertise"}
+{final_recommendations}
 
 SCORE INTERPRETATION:
 - 80-100: Highly feasible, proceed with confidence
