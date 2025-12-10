@@ -4,12 +4,9 @@ import re
 
 
 def summarize_research(text):
-    prompt = f"""
-    Summarize the following research while keeping as much detail as possible.
-    Organize the summary with headings like Abstract, Introduction, Methodology, Results, Conclusion.
+    prompt = f"""Summarize concisely (200-300 words):
 
-    Text: {text[:5000]}
-    """
+{text[:3500]}"""
     response = call_llm(prompt)
     return response
 
@@ -19,21 +16,21 @@ def summarize_and_extract_fields(text: str):
     
     Returns tuple: (summary_text, fields_dict)
     """
-    prompt = f"""You are an expert document analyst. Analyze the provided text and return ONLY valid JSON with this structure:
-
+    # Optimized prompt for token efficiency
+    prompt = f"""Analyze the text and return JSON:
 {{
-    "summary": "A comprehensive summary with headings like Abstract, Introduction, Methodology, Results, Conclusion. Keep as much detail as possible.",
-    "problem_statement": "The main problem or research question",
-    "domain": "Field of study or industry",
-    "goals": ["Goal 1", "Goal 2", "Goal 3"],
+    "summary": "Concise summary (150-200 words)",
+    "problem_statement": "Main problem or research question",
+    "domain": "Field of study",
+    "goals": ["Goal 1", "Goal 2"],
     "key_topics": ["Topic 1", "Topic 2", "Topic 3"],
     "prerequisites": ["Prerequisite 1", "Prerequisite 2"]
 }}
 
-Text to analyze:
-{text[:5000]}
+Text:
+{text[:4000]}
 
-Return ONLY the JSON, no other text."""
+JSON ONLY:"""
     
     response = call_llm(prompt)
     if not response:
@@ -70,54 +67,37 @@ Return ONLY the JSON, no other text."""
 
 
 def refine_summary(previous_summary: str, state):
-    prompt = f"""
-You have an existing research summary:
+    prompt = f"""Improve summary with structured fields. Keep concise (300 words max):
 
-{previous_summary}
+Summary: {previous_summary[:1000]}
 
-And the following structured extracted fields:
+Problem: {state.problem_statement}
+Domain: {state.domain}
+Goals: {', '.join(state.goals or [])}
+Topics: {', '.join(state.key_topics or [])}
+Prerequisites: {', '.join(state.prerequisites or [])}
 
-{state.model_dump()}
-
-Create a new, improved, refined summary that:
-- integrates the structured fields into one coherent summary
-- is clearer, more complete, and academically correct
-- removes redundancy
-- fills gaps from the previous summary
-
-Return plain text only.
-"""
+Return plain text only."""
     return call_llm(prompt)
 
 
 def refine_summary_research_style(previous_summary: str, state):
-        """
-        Produce a long-form refined summary in research style with clear headings
-        (e.g., Abstract, Introduction, Background, Methodology/Approach, System Design,
-        Implementation, Results/Expected Outcomes, Limitations, Future Work, Conclusion).
-        Integrate structured fields from the state.
-        """
-        prompt = f"""
-You are an expert technical writer. Rewrite the summary below into a comprehensive
-research-style document with multiple headings.
+    """
+    Produce a refined summary in research style with clear headings.
+    Optimized for token efficiency.
+    """
+    prompt = f"""Rewrite as research-style summary with headings: Abstract, Introduction, 
+Methodology, Results, Limitations, Conclusion.
 
-Existing summary:
-{previous_summary}
+Summary: {previous_summary[:1500]}
 
-Structured fields:
-{state.model_dump()}
+Domain: {state.domain}
+Problem: {state.problem_statement}
+Goals: {', '.join(state.goals or [])}
+Topics: {', '.join(state.key_topics or [])}
 
-Requirements:
-- Use these headings (adapt if some are not applicable but keep structure):
-    Abstract, Introduction, Background, Methodology/Approach, System Design,
-    Implementation, Results/Expected Outcomes, Limitations, Future Work, Conclusion.
-- Be detailed but concise per section (2–6 paragraphs total across the document).
-- Integrate problem statement, domain, goals, prerequisites, and key topics throughout.
-- Maintain clarity and academic tone.
-- If some fields are missing or the user was unsure, make reasonable assumptions based on context; briefly note assumptions where relevant.
-- Return plain text only with headings.
-"""
-        return call_llm(prompt)
+Keep concise (max 400 words). Plain text with headings only."""
+    return call_llm(prompt)
 
 
 # if __name__ == "__main__":

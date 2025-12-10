@@ -1,16 +1,13 @@
-"""LLM-driven source selection and comprehensive research arrangement node.
+"""Research enrichment router node - source selection without LLM synthesis.
 
-Workflow:
+Workflow (optimized for token efficiency):
  1. Inspect `ResearchState.intermediate` fields + existing summary.
- 2. Ask LLM (Gemini) to decide which enrichment source to use: `wiki` or `ddg`.
+ 2. Use heuristic routing (no LLM) to decide wiki vs ddg.
  3. Invoke the chosen enrichment node (`wiki_node` or `ddg_node`).
- 4. Ask LLM to synthesize a cohesive `llm_research_report` combining:
-	  - core required fields
-	  - selected enrichment output (wiki_summary or ddg_results)
-	  - brief rationale of source choice
- 5. Update `consolidated_research` (append if already present).
+ 4. Use raw enrichment directly (no LLM synthesis to llm_research_report).
+ 5. Update `consolidated_research` with raw enrichment data.
 
-Fails gracefully if LLM errors (keeps state unchanged except for noting error).
+Token optimization: Skips expensive LLM arrangement/synthesis step.
 """
 
 import json
@@ -35,18 +32,7 @@ Do not add commentary outside JSON.
 """.strip()
 
 
-ARRANGE_INSTRUCTIONS = """
-You are a research arranger. Given required fields and enrichment data, produce a
-concise but rich synthesis for product/roadmap planning.
-Output format:
-1. Executive Overview (2-3 sentences)
-2. Problem & Context (bullet-like compact sentences)
-3. Goals Elaboration (comma-separated refinement)
-4. Key Topics & Their Roles (short list)
-5. Prerequisites & Dependencies (short list)
-6. Strategic Considerations (1 paragraph)
-Return ONLY the arranged text (no JSON, no extra commentary).
-""".strip()
+# Removed: ARRANGE_INSTRUCTIONS - no longer needed (skip LLM synthesis)
 
 
 def _safe_json_extract(raw: str) -> dict:
@@ -93,34 +79,18 @@ def _decide_source(state: ResearchState) -> tuple[Literal["wiki", "ddg"], str]:
 			return "wiki", "Single focused goal, using Wiki for authoritative context"
 
 
-def _arrange_report(state: ResearchState, source_choice: str, reason: str) -> str:
-	interm = state.intermediate
-	enrichment_block = ""
-	if source_choice == "wiki" and state.wiki_summary:
-		enrichment_block = state.wiki_summary[:2500]
-	elif source_choice == "ddg" and state.ddg_results:
-		enrichment_block = " | ".join(state.ddg_results[:40])[:2500]
-
-	prompt = (
-		f"{ARRANGE_INSTRUCTIONS}\n\n"
-		f"Source Chosen: {source_choice}\nReason: {reason}\n\n"
-		f"Domain: {interm.domain}\n"
-		f"Problem Statement: {interm.problem_statement}\n"
-		f"Goals: {', '.join(interm.goals or [])}\n"
-		f"Key Topics: {', '.join(interm.key_topics or [])}\n"
-		f"Prerequisites: {', '.join(interm.prerequisites or [])}\n"
-		f"Enrichment Data:\n{enrichment_block}\n"
-	)
-	arranged = call_llm(prompt)
-	return arranged.strip()
+# Removed: _arrange_report - using raw enrichment data directly to save tokens
 
 
 def research_llm_router_node(state: ResearchState) -> ResearchState:
-	"""Master LLM node performing source routing + arrangement.
+	"""Master router node performing source selection and enrichment.
 
-	- Decides between wiki or ddg.
+	- Decides between wiki or ddg using heuristics (no LLM call).
 	- Invokes the chosen enrichment node if not yet populated.
-	- Produces `llm_research_report` and updates `consolidated_research`.
+	- Sets llm_research_report to raw enrichment (no LLM synthesis).
+	- Updates consolidated_research with enrichment data.
+
+	Token optimization: Skips LLM synthesis step, uses raw enrichment directly.
 	"""
 	if not state.intermediate:
 		return state
@@ -133,12 +103,21 @@ def research_llm_router_node(state: ResearchState) -> ResearchState:
 	elif source == "ddg" and not state.ddg_results:
 		state = ddg_node(state)
 
-	# Arrange final report
-	report = _arrange_report(state, source, reason)
+	# Use raw enrichment directly - no LLM arrangement call
+	# This saves significant tokens by skipping synthesis step
+	if source == "wiki" and state.wiki_summary:
+		# Use wiki summary directly as the report (truncate to 3000 chars)
+		report = state.wiki_summary[:3000]
+	elif source == "ddg" and state.ddg_results:
+		# Format DDG results as bullet list (use top 15 results)
+		report = "\n".join([f"- {result}" for result in state.ddg_results[:15]])
+	else:
+		report = ""
+
 	state.llm_research_report = report
 
 	if state.consolidated_research:
-		state.consolidated_research += "\n\n--- LLM Synthesized Report ---\n" + report
+		state.consolidated_research += "\n\n--- Enrichment Data ---\n" + report
 	else:
 		state.consolidated_research = report
 

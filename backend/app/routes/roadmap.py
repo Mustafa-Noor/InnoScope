@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from app.pipelines.builds.roadmap_pipeline import run_roadmap_pipeline
 from app.pipelines.builds.roadmap_pipeline_from_chat import run_roadmap_from_chat
 from app.pipelines.builds.roadmap_pipeline_streaming import run_roadmap_pipeline_streaming
+from app.pipelines.builds.roadmap_pipeline_from_summary_streaming import run_roadmap_from_summary_streaming
+from app.schemas.roadmap import RoadmapFromSummaryRequest
 from fastapi import UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -168,4 +170,43 @@ async def generate_roadmap_stream(file: UploadFile = File(...)):
     except Exception as e:
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.post("/generate-from-summary-stream")
+async def generate_roadmap_from_summary_stream(request: RoadmapFromSummaryRequest = Body(...)):
+    """
+    Generate roadmap from a text summary with real-time status streaming.
+    
+    Args:
+        request: RoadmapFromSummaryRequest containing the project summary
+        
+    Returns:
+        Server-sent events stream with roadmap generation progress and final roadmap
+    """
+    try:
+        if not request or not hasattr(request, 'summary'):
+            raise HTTPException(status_code=400, detail="Request body must contain 'summary' field")
+        
+        summary = request.summary.strip() if isinstance(request.summary, str) else str(request.summary).strip()
+        
+        if not summary:
+            raise HTTPException(status_code=400, detail="Summary text cannot be empty")
+        
+        async def event_generator():
+            try:
+                for event in run_roadmap_from_summary_streaming(summary):
+                    yield event
+            finally:
+                pass  # No file cleanup needed for summary input
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Roadmap from summary stream error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Depends, Body
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -7,6 +7,7 @@ from app.pipelines.builds.feasibility_pipeline import run_feasibility_assessment
 from app.pipelines.builds.feasibility_pipeline_streaming import run_feasibility_assessment_streaming
 from app.pipelines.builds.feasibility_pipeline_from_document import run_feasibility_from_document
 from app.pipelines.builds.feasibility_pipeline_from_document_streaming import run_feasibility_from_document_streaming
+from app.pipelines.builds.feasibility_pipeline_from_summary_streaming import run_feasibility_from_summary_streaming
 from app.models.chat import ChatSessionState
 from app.database import get_db
 import logging
@@ -389,4 +390,43 @@ async def generate_feasibility_stream(
         logger.error(f"Feasibility stream error: {str(e)}", exc_info=True)
         if temp_file_path and os.path.exists(temp_file_path):
             os.unlink(temp_file_path)
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
+
+
+@router.post("/assess-from-summary-stream")
+async def assess_feasibility_from_summary_stream(body: dict = Body(...)):
+    """
+    Assess feasibility from a text summary with real-time status streaming.
+    
+    Args:
+        body: {"summary": "text summary of project"}
+        
+    Returns:
+        Server-sent events stream with feasibility assessment progress and results
+    """
+    try:
+        if not body or "summary" not in body:
+            raise HTTPException(status_code=400, detail="Request body must contain 'summary' field")
+        
+        summary = body.get("summary", "").strip() if isinstance(body.get("summary"), str) else str(body.get("summary", "")).strip()
+        
+        if not summary:
+            raise HTTPException(status_code=400, detail="Summary text cannot be empty")
+        
+        async def event_generator():
+            try:
+                for event in run_feasibility_from_summary_streaming(summary):
+                    yield event
+            finally:
+                pass  # No file cleanup needed for summary input
+        
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Feasibility from summary stream error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error: {str(e)}")

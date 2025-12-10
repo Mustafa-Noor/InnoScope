@@ -19,31 +19,20 @@ def generate_roadmap(
     summary: str | None,
 ) -> str:
     """
-    Generate a structured roadmap using layered research inputs.
+    Generate a structured roadmap using highest-fidelity input only.
 
-    Priority order: llm_report > consolidated > summary.
-    All layers still included for context.
+    Priority order: llm_report (already synthesized) > consolidated > summary.
+    Optimized for token efficiency by using only primary input.
     Enforces canonical headings and structured subsections.
     """
 
-    # Build stacked context
-    blocks = []
-    if llm_report:
-        blocks.append("[LLM_REPORT]\n" + llm_report.strip())
-    if consolidated:
-        blocks.append("[CONSOLIDATED]\n" + consolidated.strip())
-    if summary:
-        blocks.append("[SUMMARY]\n" + summary.strip())
-
-    combined_context = "\n\n".join(blocks) or "(no context)"
-    primary = llm_report or consolidated or summary or "(no primary content)"
-
-    # -------------------------
-    #    FIXED + CLEAN PROMPT
-    # -------------------------
+    # Use only the highest-fidelity available source (llm_report already synthesized)
+    primary = llm_report or consolidated or summary or "(no context)"
+    
+    # Token-optimized prompt: remove redundant context layers
     prompt = (
         "You are an expert product strategist.\n"
-        "Create a structured, actionable roadmap based on the research layers below.\n\n"
+        "Create a structured, actionable roadmap based on the research below.\n\n"
         "STRICT REQUIREMENTS:\n"
         "- Preserve EXACT headings (do not rename, reorder, add or remove):\n"
         f"{chr(10).join(HEADINGS)}\n\n"
@@ -55,11 +44,8 @@ def generate_roadmap(
         "    - 2–4 measurable indicators\n"
         "  Risks & Mitigations:\n"
         "    - 1–3 bullets formatted \"Risk: ... | Mitigation: ...\"\n\n"
-        "No added headings. If a subsection lacks data, produce a realistic placeholder.\n\n"
-        "PRIMARY (highest-fidelity) CONTENT:\n"
+        "RESEARCH CONTENT:\n"
         f"{primary}\n\n"
-        "ADDITIONAL CONTEXT LAYERS MERGED:\n"
-        f"{combined_context}\n\n"
         "Return ONLY the roadmap with the exact headings and subsections."
     )
 
