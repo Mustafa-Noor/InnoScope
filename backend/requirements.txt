@@ -18,3 +18,7 @@ passlib[argon2]
 
 langgraph
 arxiv
+
+pandas
+joblib
+scikit-learn

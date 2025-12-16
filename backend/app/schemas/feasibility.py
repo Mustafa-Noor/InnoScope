@@ -49,3 +49,8 @@ class FeasibilityRequest(BaseModel):
     goals: Optional[List[str]] = None
     prerequisites: Optional[List[str]] = None
     key_topics: Optional[List[str]] = None
+
+
+
+
+
