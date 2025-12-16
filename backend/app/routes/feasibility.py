@@ -3,11 +3,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.schemas.feasibility import FeasibilityRequest, FeasibilityReport
+from app.schemas.feasibility_new import StructuredFeasibilityInput
 from app.pipelines.builds.feasibility_pipeline import run_feasibility_assessment
 from app.pipelines.builds.feasibility_pipeline_streaming import run_feasibility_assessment_streaming
 from app.pipelines.builds.feasibility_pipeline_from_document import run_feasibility_from_document
 from app.pipelines.builds.feasibility_pipeline_from_document_streaming import run_feasibility_from_document_streaming
 from app.pipelines.builds.feasibility_pipeline_from_summary_streaming import run_feasibility_from_summary_streaming
+from app.pipelines.builds.feasibility_pipeline_new import run_feasibility_assessment as run_new_assessment, convert_state_to_report
 from app.models.chat import ChatSessionState
 from app.database import get_db
 import logging
@@ -20,6 +22,73 @@ router = APIRouter(
     prefix="/feasibility",
     tags=["Feasibility Assessment"]
 )
+
+
+@router.post("/assess-structured", response_model=dict)
+async def assess_structured_feasibility(
+    request: StructuredFeasibilityInput,
+):
+    """
+    Assess feasibility using structured fields (25+ parameters).
+    
+    Combines:
+    1. ML model prediction (trained on dataset)
+    2. Semantic search (relevant papers from arXiv)
+    3. Unified LLM assessment (5 dimensions in single call)
+    4. Detailed report generation
+    
+    Args:
+        request: StructuredFeasibilityInput with all project fields
+    
+    Returns:
+        Complete feasibility report with ML score, papers, and analysis
+    """
+    logger.info(f"Structured feasibility assessment requested for {request.project_id}")
+    
+    try:
+        # Run the integrated LangGraph pipeline
+        assessment_state = run_new_assessment(request)
+        
+        # Convert state to report
+        report = convert_state_to_report(assessment_state)
+        
+        # Return as JSON-serializable dict
+        return {
+            "project_id": report.project_id,
+            "final_score": report.final_score,
+            "viability_status": report.viability_status,
+            "ml_score": report.ml_score,
+            "ml_confidence": report.ml_confidence,
+            "dimension_scores": {
+                "technical": report.technical_score,
+                "resource": report.resource_score,
+                "skills": report.skills_score,
+                "scope": report.scope_score,
+                "risk": report.risk_score,
+            },
+            "relevant_papers": [
+                {
+                    "title": p.title,
+                    "summary": p.summary[:200],
+                    "link": p.link,
+                    "relevance_score": p.relevance_score
+                }
+                for p in report.relevant_papers
+            ],
+            "explanation": report.explanation,
+            "key_risks": report.key_risks,
+            "recommendations": report.recommendations,
+            "detailed_report": report.detailed_report,
+            "assessment_timestamp": report.assessment_timestamp,
+            "assessment_model_version": report.assessment_model_version,
+        }
+        
+    except Exception as e:
+        logger.error(f"Error during structured feasibility assessment: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Assessment failed: {str(e)}"
+        )
 
 
 @router.post("/assess", response_model=FeasibilityReport)
