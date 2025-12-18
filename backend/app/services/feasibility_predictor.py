@@ -73,8 +73,9 @@ class FeasibilityPredictor:
             for col in df.columns:
                 if col not in (self.label_encoders.keys() if self.label_encoders else []):
                     try:
-                        df[col] = pd.to_numeric(df[col], errors='ignore')
-                    except:
+                        df[col] = pd.to_numeric(df[col])
+                    except (ValueError, TypeError):
+                        # Column is not numeric, keep as-is
                         pass
             
             # Ensure features match training data
