@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import roadmap, auth, chat, feasibility, test
+from app.routes import roadmap, auth, chat, feasibility, test, summarize
 
 app = FastAPI()
 app.include_router(roadmap.router)
@@ -8,6 +8,7 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(feasibility.router)
 app.include_router(test.router)
+app.include_router(summarize.router)
 
 app.add_middleware(
     CORSMiddleware,

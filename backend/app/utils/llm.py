@@ -5,7 +5,7 @@ from app.config import settings
 genai.configure(api_key=settings.GOOGLE_API_KEY)
 
 # Load the model once at module level
-model = genai.GenerativeModel("gemini-2.5-flash")
+model = genai.GenerativeModel("gemini-2.5-flash-lite")
 
 
 def call_llm(prompt: str) -> str:
