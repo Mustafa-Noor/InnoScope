@@ -217,13 +217,6 @@ export default function LaymanChatPage() {
     }
   };
 
-      
-      // After 2nd message, trigger analysis
-      if (userMessageCount === 2) {
-        setTimeout(() => triggerConversationAnalysis(), 500);
-      }
-    }
-  };
 
   const triggerConversationAnalysis = async () => {
     try {
