@@ -22,3 +22,5 @@ arxiv
 pandas
 joblib
 scikit-learn
+
+qdrant-client

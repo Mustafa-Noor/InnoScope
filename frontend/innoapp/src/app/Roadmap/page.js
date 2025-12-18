@@ -20,6 +20,7 @@ export default function RoadmapPage() {
   const [isAnalyzingFeasibility, setIsAnalyzingFeasibility] = useState(false);
   const [loadingStages, setLoadingStages] = useState([]);
   const [currentProgress, setCurrentProgress] = useState(0);
+  const [isSummarizing, setIsSummarizing] = useState(false);
   const folderInputRef = useRef(null);
   const progressRef = useRef(null);
   const resultsRef = useRef(null);
@@ -397,43 +398,37 @@ export default function RoadmapPage() {
       return;
     }
 
-    setIsGenerating(true);
+    setIsSummarizing(true);
     try {
+      // Send file directly using FormData
       const formData = new FormData();
       formData.append('file', files[0]);
-
-      const res = await fetch(`${API_BASE}/roadmap/summarize`, {
+      
+      const res = await fetch(`${API_BASE}/summarize/file`, {
         method: 'POST',
         body: formData,
+        // Note: DO NOT set Content-Type header for FormData - browser will set it automatically
       });
 
       if (!res.ok) {
-        // fallback: try to call same generate endpoint and use its summary
-        const fallback = await fetch(`${API_BASE}/roadmap/generate`, { method: 'POST', body: formData });
-        const fbData = await fallback.json().catch(() => ({}));
-        if (fallback.ok && fbData.summary) {
-          setRoadmapData((d) => ({ ...(d || {}), summary: fbData.summary }));
-        } else {
-          alert('Summarization not available on server.');
-        }
-        return;
+        throw new Error(`HTTP error! status: ${res.status}`);
       }
 
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json();
       if (data?.summary) {
         setRoadmapData((d) => ({ ...(d || {}), summary: data.summary }));
         setShowSummary(true);
-      } else if (data?.text) {
-        setRoadmapData((d) => ({ ...(d || {}), summary: data.text }));
-        setShowSummary(true);
+        setToastMessage('✅ Summarization complete!');
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
       } else {
         alert('No summary returned');
       }
-    } catch (e) {
-      console.error(e);
-      alert('Error while summarizing.');
+    } catch (error) {
+      console.error('Error summarizing:', error);
+      alert('Error while summarizing: ' + error.message);
     } finally {
-      setIsGenerating(false);
+      setIsSummarizing(false);
     }
   };
 
@@ -1188,11 +1183,11 @@ export default function RoadmapPage() {
                   zIndex: 2,
                   alignItems: 'flex-start',
                   flexWrap: 'wrap',
-                  maxWidth: `${Math.min(roadmapData.phases.length * 240, 1200)}px`,
+                  maxWidth: `${Math.min((roadmapData?.phases?.length || 0) * 240, 1200)}px`,
                   margin: '0 auto'
                 }}
               >
-                {roadmapData.phases.map((phase, index) => {
+                {roadmapData?.phases?.map((phase, index) => {
                   // Dynamic icon generation based on phase type or index
                   const getPhaseIcon = (phaseIndex, phaseName) => {
                     const defaultIcons = ['🚀', '📋', '⚙️', '🎯', '🔧', '📊', '🌟', '✅'];
@@ -1241,7 +1236,7 @@ export default function RoadmapPage() {
                     });
                   };
 
-                  const phaseColors = generatePhaseColors(roadmapData.phases.length);
+                  const phaseColors = generatePhaseColors((roadmapData?.phases?.length || 0));
                   const phaseGradients = generatePhaseGradients(phaseColors);
                   const phaseIcon = getPhaseIcon(index, phase.name);
                   
@@ -1558,7 +1553,7 @@ export default function RoadmapPage() {
                 margin: '30px auto 0'
               }}
             >
-              {roadmapData.phases.map((phase, index) => {
+              {roadmapData?.phases?.map((phase, index) => {
                 const phaseColors = ['#059669', '#0891b2', '#7c3aed', '#dc2626', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6'];
                 
                 return (
@@ -1581,7 +1576,7 @@ export default function RoadmapPage() {
                     />
                     
                     {/* Connection Line */}
-                    {index < roadmapData.phases.length - 1 && (
+                    {index < (roadmapData?.phases?.length || 0) - 1 && (
                       <div
                         style={{
                           width: '32px',
@@ -1607,7 +1602,7 @@ export default function RoadmapPage() {
                   fontFamily: 'Poppins, sans-serif'
                 }}
               >
-                {roadmapData.phases.length} Phase{roadmapData.phases.length !== 1 ? 's' : ''} Complete
+                {roadmapData?.phases?.length || 0} Phase{(roadmapData?.phases?.length || 0) !== 1 ? 's' : ''} Complete
               </div>
             </div>
           </div>

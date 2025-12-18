@@ -8,9 +8,13 @@ import os
 import logging
 import pandas as pd
 from typing import Dict, List, Optional
+from huggingface_hub import hf_hub_download
 from app.schemas.feasibility_new import StructuredFeasibilityInput, FeasibilityPrediction
 
 logger = logging.getLogger(__name__)
+
+# HuggingFace model repository
+HF_REPO_ID = "MustafaNoor/FeasibilityPredictor"
 
 
 class FeasibilityPredictor:
@@ -23,31 +27,42 @@ class FeasibilityPredictor:
         self.load_model()
     
     def load_model(self):
-        """Load the trained ML model and encoders."""
+        """Load the trained ML model and encoders from HuggingFace."""
         try:
-            model_dir = os.path.join(os.path.dirname(__file__), "../model")
+            logger.info(f"Loading models from HuggingFace: {HF_REPO_ID}")
             
-            model_path = os.path.join(model_dir, "feasibility_model.pkl")
-            encoders_path = os.path.join(model_dir, "label_encoders.pkl")
-            features_path = os.path.join(model_dir, "feature_names.pkl")
+            # Download model files from HuggingFace Hub
+            model_path = hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename="feasibility_model.pkl",
+                repo_type="model"
+            )
             
-            if not os.path.exists(model_path):
-                logger.warning(f"Model not found at {model_path}. Using fallback scoring.")
-                return
+            encoders_path = hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename="label_encoders.pkl",
+                repo_type="model"
+            )
             
+            features_path = hf_hub_download(
+                repo_id=HF_REPO_ID,
+                filename="feature_names.pkl",
+                repo_type="model"
+            )
+            
+            # Load the models
             self.model = joblib.load(model_path)
-            logger.info(f"Loaded model from {model_path}")
+            logger.info(f"✓ Loaded feasibility model from HF")
             
-            if os.path.exists(encoders_path):
-                self.label_encoders = joblib.load(encoders_path)
-                logger.info(f"Loaded encoders from {encoders_path}")
+            self.label_encoders = joblib.load(encoders_path)
+            logger.info(f"✓ Loaded label encoders from HF")
             
-            if os.path.exists(features_path):
-                self.feature_names = joblib.load(features_path)
-                logger.info(f"Loaded feature names from {features_path}")
+            self.feature_names = joblib.load(features_path)
+            logger.info(f"✓ Loaded feature names from HF")
                 
         except Exception as e:
-            logger.error(f"Error loading model: {e}")
+            logger.error(f"Error loading models from HuggingFace: {e}")
+            logger.warning("Using fallback scoring without ML model")
             self.model = None
     
     def predict(self, input_data: StructuredFeasibilityInput) -> FeasibilityPrediction:
