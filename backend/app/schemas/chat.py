@@ -39,6 +39,7 @@ class ChatRequest(BaseModel):
     session_id: Optional[int] = None
     message: str
     topic: Optional[str] = None  # Required only on first message
+    user_id: Optional[str] = None  # MCP provides as string
 
 class ChatResponse(BaseModel):
     session_id: int

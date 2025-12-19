@@ -27,16 +27,16 @@ async def send_message(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    logger.info("Called function-")
+    logger.info(f"Chat message from user_id={request.user_id}")
     return await handle_chat(request, db, None, background_tasks)
 
 
 @router.get("/sessions", response_model=List[ChatSessionOut])
 async def get_chat_sessions(
-    db: AsyncSession = Depends(get_db),
-    user_id: int = Query(default=1, description="User ID for fetching sessions")
+    user_id: int = Query(..., description="User ID (required)"),
+    db: AsyncSession = Depends(get_db)
 ):
-    """Retrieve all chat sessions for a user (defaults to user_id=1 for unauthenticated)."""
+    """Retrieve all chat sessions for a user."""
     try:
         result = await db.execute(
             select(ChatSession)
@@ -54,9 +54,22 @@ async def get_chat_sessions(
 @router.get("/sessions/{session_id}/messages", response_model=List[ChatMessageOut])
 async def get_session_messages(
     session_id: int,
+    user_id: int = Query(..., description="User ID (required)"),
     db: AsyncSession = Depends(get_db),
 ):
     """Retrieve all messages for a specific chat session."""
+    # Verify session belongs to user
+    result = await db.execute(
+        select(ChatSession).where(
+            ChatSession.id == session_id,
+            ChatSession.user_id == user_id
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Get messages
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == session_id)

@@ -94,7 +94,10 @@ export default function LaymanChatPage() {
     setGeneratingProgress(0);
     setGeneratingMessage("");
     try {
-      const res = await fetch(`${API_BASE}/chat/sessions/${sid}/messages`);
+      const userId = resolveUserId() || "1";
+      const url = new URL(`${API_BASE}/chat/sessions/${sid}/messages`);
+      url.searchParams.set("user_id", userId);
+      const res = await fetch(url.toString());
       if (!res.ok) return;
       const data = await res.json();
       const formatted = (data || []).map((m, idx) => ({

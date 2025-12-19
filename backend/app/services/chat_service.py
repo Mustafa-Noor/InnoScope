@@ -17,8 +17,16 @@ async def handle_chat(
     background_tasks: BackgroundTasks
 ) -> ChatResponse:
     
-    # Use default user_id=1 if no current_user (unauthenticated access)
-    user_id = current_user.id if current_user else 1
+    # Extract user_id from request (MCP provides as string)
+    if request.user_id:
+        try:
+            user_id = int(request.user_id)  # Convert string to int
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail="Invalid user_id format")
+    elif current_user:
+        user_id = current_user.id  # Fallback to authenticated user
+    else:
+        raise HTTPException(status_code=401, detail="user_id required")  # No fallback to 1
     
     # 1. Get or create chat session
     # Treat missing, null, or non-positive session_id as a new session

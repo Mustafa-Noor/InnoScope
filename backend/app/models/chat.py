@@ -12,7 +12,7 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, nullable=False)  # No FK - supports MCP user IDs
     topic = Column(String(100))
     title = Column(String(255))
     memory = Column(Text, nullable=True)
