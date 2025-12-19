@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 
@@ -43,3 +43,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: int
     reply: str
+    is_complete: bool = False  # True when 2 user messages reached
+    problem_statement: Optional[str] = None
+    domain: Optional[str] = None
+    goals: Optional[List[str]] = None
+    prerequisites: Optional[List[str]] = None
+    key_topics: Optional[List[str]] = None
+    summary: Optional[str] = None

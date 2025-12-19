@@ -49,6 +49,11 @@ def chat_route_decision(state) -> str:
     missing = getattr(state, "missing_fields", [])
     pairs = getattr(state, "message_pairs", 0) or 0
     assume_ok = getattr(state, "assume_ok", False)
+    
+    # After 2nd user message (message_pairs >= 1), always go to refine, never ask
+    if pairs >= 1:
+        return "refine"
+    
     if missing:
         # Keep questions to at most MIN_PAIRS_BEFORE_REFINE pairs unless user allows assumptions
         if pairs < MIN_PAIRS_BEFORE_REFINE and not assume_ok:

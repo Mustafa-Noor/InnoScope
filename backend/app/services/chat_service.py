@@ -57,7 +57,7 @@ async def handle_chat(
         message=request.message
     )
     db.add(user_msg)
-    # await db.commit()
+    await db.commit()
 
     # 3. Fetch recent messages (6)
     result = await db.execute(
@@ -84,15 +84,32 @@ async def handle_chat(
 
     print("Context sent to LLM:\n", combined_context)
 
-    # 4.1 Compute conversation pairs (approximate). Count existing DB messages + current user message
+    # 4.1 Count USER messages specifically to detect 2nd message
+    try:
+        cnt_res = await db.execute(
+            select(func.count(ChatMessage.id)).where(
+                ChatMessage.session_id == session.id,
+                ChatMessage.sender == SenderType.user
+            )
+        )
+        user_message_count = int(cnt_res.scalar() or 0)  # Now includes the message we just saved
+    except Exception:
+        user_message_count = 1
+    
+    # Check if this is the 2nd user message
+    is_second_message = user_message_count == 2
+    
+    # Also compute message pairs for graph
     try:
         cnt_res = await db.execute(
             select(func.count(ChatMessage.id)).where(ChatMessage.session_id == session.id)
         )
-        total_messages = int(cnt_res.scalar() or 0) + 1  # +1 for the current uncommitted user message
+        total_messages = int(cnt_res.scalar() or 0)  # Already includes the user message we just saved
     except Exception:
-        total_messages = len(recent_messages) + 1
+        total_messages = len(recent_messages)
     message_pairs = total_messages // 2
+    
+    print(f"User messages: {user_message_count}, Is second message: {is_second_message}, Total messages: {total_messages}")
 
     # 5. Delegate to LangGraph chat agent build, seeding with any saved session state
     seeded_state = None
@@ -129,6 +146,14 @@ async def handle_chat(
         if isinstance(chat_state, dict):
             chat_state = ChatState(**chat_state)
     reply_text = chat_state.reply_text or "Could you share more details?"
+
+    # Create focused research idea summary from extracted fields
+    idea_summary = _compose_idea_summary(chat_state)
+
+    # If this is the 2nd message, replace with completion message only
+    if is_second_message:
+        completion_msg = "✅ **Given the information you provided, I've extracted the key research details.** \n\nNow you can:\n• **Summary** - Review the research summary\n• **Roadmap** - See implementation steps\n• **Feasibility** - Get feasibility analysis"
+        reply_text = completion_msg
 
     # 6. Save assistant message
     bot_msg = ChatMessage(
@@ -180,10 +205,17 @@ async def handle_chat(
     # 8. Background task to update memory
     background_tasks.add_task(update_session_memory, session.id, db)
 
-    # 9. Return response
+    # 9. Return response with extracted fields and completion flag
     return ChatResponse(
         session_id=session.id,
         reply=reply_text,
+        is_complete=is_second_message,
+        problem_statement=getattr(chat_state, "problem_statement", None),
+        domain=getattr(chat_state, "domain", None),
+        goals=getattr(chat_state, "goals", None),
+        prerequisites=getattr(chat_state, "prerequisites", None),
+        key_topics=getattr(chat_state, "key_topics", None),
+        summary=idea_summary,  # Use focused idea summary, not conversation summary
     )
 
 async def update_session_memory(session_id: str, db: AsyncSession):
@@ -221,3 +253,48 @@ async def update_session_memory(session_id: str, db: AsyncSession):
         .values(memory=new_memory)
     )
     await db.commit()
+
+
+def _compose_idea_summary(chat_state: ChatState) -> str:
+    """
+    Compose a focused research idea summary from extracted fields.
+    This is used for roadmap and feasibility generation (not conversation summary).
+    
+    Example output:
+    "Research on: Biryani preparation techniques
+    Domain: Culinary Science
+    Main Goal: Optimize cooking time and flavor infusion
+    Key Topics: rice cooking, spice blending, heat management"
+    """
+    try:
+        problem = getattr(chat_state, "problem_statement", "")
+        domain = getattr(chat_state, "domain", "")
+        goals = getattr(chat_state, "goals", [])
+        topics = getattr(chat_state, "key_topics", [])
+        
+        parts = []
+        
+        if problem:
+            parts.append(f"Research on: {problem}")
+        if domain:
+            parts.append(f"Domain: {domain}")
+        if goals and isinstance(goals, list) and goals:
+            goals_str = ", ".join([str(g) for g in goals if g])
+            if goals_str:
+                parts.append(f"Main Goals: {goals_str}")
+        if topics and isinstance(topics, list) and topics:
+            topics_str = ", ".join([str(t) for t in topics if t])
+            if topics_str:
+                parts.append(f"Key Topics: {topics_str}")
+        
+        idea_summary = "\n".join(parts)
+        
+        # If we have a good summary, use it; otherwise fall back to conversation summary
+        if idea_summary.strip():
+            return idea_summary
+        else:
+            return getattr(chat_state, "summary", "") or ""
+            
+    except Exception as e:
+        print(f"Error composing idea summary: {e}")
+        return getattr(chat_state, "summary", "") or ""
