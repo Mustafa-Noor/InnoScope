@@ -32,13 +32,15 @@ export default function LaymanChatPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [sessions, setSessions] = useState([]);
   const [sending, setSending] = useState(false);
-  const [userMessageCount, setUserMessageCount] = useState(0);
-  const [chatLocked, setChatLocked] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [feasibilityData, setFeasibilityData] = useState(null);
-  const [roadmapData, setRoadmapData] = useState(null);
-  const [statusUpdates, setStatusUpdates] = useState([]);
-  const [showSummary, setShowSummary] = useState(false);
+  const [chatComplete, setChatComplete] = useState(false);
+  const [extractedData, setExtractedData] = useState(null);
+  const [activeResult, setActiveResult] = useState(null); // "summary", "roadmap", or "feasibility"
+  const [summaryResult, setSummaryResult] = useState(null);
+  const [roadmapResult, setRoadmapResult] = useState(null);
+  const [feasibilityResult, setFeasibilityResult] = useState(null);
+  const [generatingResult, setGeneratingResult] = useState(null); // which result is loading
+  const [generatingProgress, setGeneratingProgress] = useState(0);
+  const [generatingMessage, setGeneratingMessage] = useState("");
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -84,8 +86,18 @@ export default function LaymanChatPage() {
   const loadSession = async (sid) => {
     setSessionId(sid);
     setMessages([]);
+    setActiveResult(null);
+    setSummaryResult(null);
+    setRoadmapResult(null);
+    setFeasibilityResult(null);
+    setGeneratingResult(null);
+    setGeneratingProgress(0);
+    setGeneratingMessage("");
     try {
-      const res = await fetch(`${API_BASE}/chat/sessions/${sid}/messages`);
+      const userId = resolveUserId() || "1";
+      const url = new URL(`${API_BASE}/chat/sessions/${sid}/messages`);
+      url.searchParams.set("user_id", userId);
+      const res = await fetch(url.toString());
       if (!res.ok) return;
       const data = await res.json();
       const formatted = (data || []).map((m, idx) => ({
@@ -104,8 +116,15 @@ export default function LaymanChatPage() {
     setSessionId(null);
     setMessages([createWelcomeMessage()]);
     setInputValue("");
-    setUserMessageCount(0);
-    setChatLocked(false);
+    setChatComplete(false);
+    setExtractedData(null);
+    setActiveResult(null);
+    setSummaryResult(null);
+    setRoadmapResult(null);
+    setFeasibilityResult(null);
+    setGeneratingResult(null);
+    setGeneratingProgress(0);
+    setGeneratingMessage("");
   };
 
   const handleSendMessage = async (e) => {
@@ -133,9 +152,8 @@ export default function LaymanChatPage() {
     setUserMessageCount((prev) => prev + 1);
 
     try {
-      const userId = resolveUserId();
-      const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
-      if (userId) payload.user_id = Number(userId);
+      const userId = resolveUserId() || "1";  // Always have a user_id, default to '1'
+      const payload = sessionId ? { session_id: sessionId, message: text, user_id: userId } : { message: text, user_id: userId };
 
       let authToken = BUILT_IN_API_KEY;
       try {
@@ -197,6 +215,19 @@ export default function LaymanChatPage() {
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
+
+      // Check if chat is complete
+      if (data?.is_complete) {
+        setChatComplete(true);
+        setExtractedData({
+          summary: data.summary || "",
+          problem_statement: data.problem_statement || "",
+          domain: data.domain || "",
+          goals: data.goals || [],
+          prerequisites: data.prerequisites || [],
+          key_topics: data.key_topics || [],
+        });
+      }
     } catch (err) {
       setMessages((prev) => [
         ...prev,
@@ -209,133 +240,150 @@ export default function LaymanChatPage() {
       ]);
     } finally {
       setSending(false);
-      
-      // After 2nd message, trigger analysis
-      if (userMessageCount === 2) {
-        setTimeout(() => triggerConversationAnalysis(), 500);
-      }
     }
   };
 
-
-  const triggerConversationAnalysis = async () => {
+  const generateSummary = async () => {
+    if (!extractedData?.summary) return;
+    setGeneratingResult("summary");
     try {
-      setIsGenerating(true);
-      setStatusUpdates([]);
-      
-      // Create conversation summary
-      const conversationText = messages
-        .filter(m => m.sender === "user")
-        .map(m => m.text)
-        .join("\n\n");
-      
-      if (!conversationText) return;
-
-      console.log("Starting conversation analysis...");
-      console.log("Conversation text:", conversationText);
-
-      // First, summarize the conversation
-      setStatusUpdates(prev => [...prev, "📝 Summarizing conversation..."]);
-      
-      const summaryRes = await fetch(`${API_BASE}/summarize/text`, {
+      const res = await fetch(`${API_BASE}/summarize/text`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: conversationText }),
+        body: JSON.stringify({ text: extractedData.summary }),
       });
+      const data = await res.json();
+      setSummaryResult(data.summary || "No summary generated");
+      setActiveResult("summary");
+      // Scroll to results
+      setTimeout(() => {
+        document.querySelector('[data-result-panel]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (error) {
+      console.error("Summary error:", error);
+      setSummaryResult(`Error: ${error.message}`);
+    } finally {
+      setGeneratingResult(null);
+    }
+  };
 
-      if (!summaryRes.ok) throw new Error("Failed to summarize conversation");
-      const summaryData = await summaryRes.json();
-      const conversationSummary = summaryData.summary || conversationText;
-      
-      setStatusUpdates(prev => [...prev, "✓ Summary generated"]);
-      console.log("Summary:", conversationSummary);
-
-      // Now run feasibility analysis with streaming
-      setStatusUpdates(prev => [...prev, "🔍 Analyzing feasibility..."]);
-      
-      const feasRes = await fetch(`${API_BASE}/feasibility/from-summary-streaming`, {
+  const generateRoadmap = async () => {
+    if (!extractedData?.summary) return;
+    setGeneratingResult("roadmap");
+    try {
+      const res = await fetch(`${API_BASE}/roadmap/generate-from-summary-stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ summary: conversationSummary }),
+        body: JSON.stringify({ summary: extractedData.summary }),
       });
 
-      if (!feasRes.ok) throw new Error("Feasibility stream failed");
-
-      const reader = feasRes.body.getReader();
-      let feasData = null;
+      const reader = res.body.getReader();
+      let result = null;
+      let buffer = "";
+      let currentEvent = null;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        const text = new TextDecoder().decode(value);
-        const lines = text.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
+        
+        buffer += new TextDecoder().decode(value);
+        const lines = buffer.split("\n");
+        
+        // Keep the last incomplete line in the buffer
+        buffer = lines[lines.length - 1];
+        
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i];
+          
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && currentEvent) {
             try {
               const json = JSON.parse(line.slice(6));
-              if (json.event === "complete") {
-                feasData = json.data;
-                console.log("Feasibility complete:", feasData);
-              }
-              if (json.data?.status) {
-                setStatusUpdates(prev => [...prev, `📊 ${json.data.status}`]);
+              if (currentEvent === "complete") {
+                result = json;
+              } else if (currentEvent === "status") {
+                // Show progress updates in UI
+                console.log(`[Roadmap] ${json.stage || 'working'}: ${json.message} (${json.progress || 0}%)`);
+                setGeneratingProgress(json.progress || 0);
+                setGeneratingMessage(json.message || `Processing... ${json.progress || 0}%`);
               }
             } catch (e) {}
           }
         }
       }
 
-      setFeasibilityData(feasData);
-      setStatusUpdates(prev => [...prev, "✓ Feasibility analysis complete"]);
+      setRoadmapResult(result);
+      setActiveResult("roadmap");
+      // Scroll to results
+      setTimeout(() => {
+        document.querySelector('[data-result-panel]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    } catch (error) {
+      console.error("Roadmap error:", error);
+      setRoadmapResult({ error: error.message });
+    } finally {
+      setGeneratingResult(null);
+    }
+  };
 
-      // Now run roadmap generation with streaming
-      setStatusUpdates(prev => [...prev, "🗺️ Generating roadmap..."]);
-      
-      const roadmapRes = await fetch(`${API_BASE}/roadmap/from-summary-streaming`, {
+  const generateFeasibility = async () => {
+    if (!extractedData?.summary) return;
+    setGeneratingResult("feasibility");
+    try {
+      const res = await fetch(`${API_BASE}/feasibility/assess-from-summary-stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ summary: conversationSummary }),
+        body: JSON.stringify({ summary: extractedData.summary }),
       });
 
-      if (!roadmapRes.ok) throw new Error("Roadmap stream failed");
-
-      const roadmapReader = roadmapRes.body.getReader();
-      let roadmapDataResult = null;
+      const reader = res.body.getReader();
+      let result = null;
+      let buffer = "";
+      let currentEvent = null;
 
       while (true) {
-        const { done, value } = await roadmapReader.read();
+        const { done, value } = await reader.read();
         if (done) break;
-
-        const text = new TextDecoder().decode(value);
-        const lines = text.split("\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
+        
+        buffer += new TextDecoder().decode(value);
+        const lines = buffer.split("\n");
+        
+        // Keep the last incomplete line in the buffer
+        buffer = lines[lines.length - 1];
+        
+        for (let i = 0; i < lines.length - 1; i++) {
+          const line = lines[i];
+          
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7).trim();
+          } else if (line.startsWith("data: ") && currentEvent) {
             try {
               const json = JSON.parse(line.slice(6));
-              if (json.event === "complete") {
-                roadmapDataResult = json.data;
-                console.log("Roadmap complete:", roadmapDataResult);
-              }
-              if (json.data?.status) {
-                setStatusUpdates(prev => [...prev, `🗺️ ${json.data.status}`]);
+              if (currentEvent === "complete") {
+                result = json;
+              } else if (currentEvent === "status") {
+                // Show progress updates in UI
+                console.log(`[Feasibility] ${json.stage || 'working'}: ${json.message} (${json.progress || 0}%)`);
+                setGeneratingProgress(json.progress || 0);
+                setGeneratingMessage(json.message || `Processing... ${json.progress || 0}%`);
               }
             } catch (e) {}
           }
         }
       }
 
-      setRoadmapData(roadmapDataResult);
-      setStatusUpdates(prev => [...prev, "✓ Roadmap generated"]);
-      setShowSummary(true);
-
+      setFeasibilityResult(result);
+      setActiveResult("feasibility");
+      // Scroll to results
+      setTimeout(() => {
+        document.querySelector('[data-result-panel]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } catch (error) {
-      console.error("Analysis error:", error);
-      setStatusUpdates(prev => [...prev, `❌ Error: ${error.message}`]);
+      console.error("Feasibility error:", error);
+      setFeasibilityResult({ error: error.message });
     } finally {
-      setIsGenerating(false);
+      setGeneratingResult(null);
     }
   };
 
@@ -428,78 +476,198 @@ export default function LaymanChatPage() {
                 className="chat-input"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                placeholder={chatLocked ? "Chat limit reached. See options below." : "Type your research question..."}
-                disabled={sending || chatLocked}
+                placeholder={chatComplete ? "Chat complete. Choose an option below." : "Type your research question..."}
+                disabled={sending || chatComplete}
               />
-              <button type="submit" className="send-btn" disabled={sending || !inputValue.trim() || chatLocked}>
+              <button type="submit" className="send-btn" disabled={sending || !inputValue.trim() || chatComplete}>
                 {sending ? "Sending..." : "Send"}
               </button>
             </div>
           </form>
 
-          {/* Status Updates During Generation */}
-          {isGenerating && (
+          {/* Action Buttons When Chat Complete */}
+          {chatComplete && (
             <div style={{
+              display: 'flex',
+              gap: '12px',
+              justifyContent: 'center',
               padding: '16px',
-              backgroundColor: '#f0f9ff',
-              borderTop: '1px solid #bfdbfe',
-              maxHeight: '150px',
-              overflowY: 'auto',
-              fontSize: '13px',
-              color: '#1e40af',
-              fontFamily: 'Poppins, sans-serif'
+              backgroundColor: '#f0fdf4',
+              borderTop: '1px solid #dcfce7',
+              flexWrap: 'wrap'
             }}>
-              {statusUpdates.map((update, idx) => (
-                <div key={idx} style={{ marginBottom: '6px' }}>{update}</div>
-              ))}
+              <button
+                onClick={generateSummary}
+                disabled={generatingResult === "summary"}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: activeResult === "summary" ? '#10b981' : '#e0f2fe',
+                  color: activeResult === "summary" ? 'white' : '#0369a1',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  transition: 'all 0.3s'
+                }}
+              >
+                {generatingResult === "summary" ? "Generating..." : "📄 Summary"}
+              </button>
+              <button
+                onClick={generateRoadmap}
+                disabled={generatingResult === "roadmap"}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: activeResult === "roadmap" ? '#3b82f6' : '#f0f9ff',
+                  color: activeResult === "roadmap" ? 'white' : '#0c4a6e',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  transition: 'all 0.3s'
+                }}
+              >
+                {generatingResult === "roadmap" ? "Generating..." : "🗺️ Roadmap"}
+              </button>
+              <button
+                onClick={generateFeasibility}
+                disabled={generatingResult === "feasibility"}
+                style={{
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: activeResult === "feasibility" ? '#f59e0b' : '#fef3c7',
+                  color: activeResult === "feasibility" ? 'white' : '#92400e',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                  transition: 'all 0.3s'
+                }}
+              >
+                {generatingResult === "feasibility" ? "Analyzing..." : "✓ Feasibility"}
+              </button>
             </div>
           )}
 
-          {/* Results Display When Ready */}
-          {chatLocked && showSummary && !isGenerating && (feasibilityData || roadmapData) && (
+          {/* Progress Message Display */}
+          {generatingResult && generatingMessage && (
             <div style={{
-              padding: '20px',
-              backgroundColor: '#f0f9ff',
-              borderTop: '1px solid #bfdbfe',
-              maxHeight: '400px',
-              overflowY: 'auto'
+              padding: '12px 16px',
+              backgroundColor: '#e0f2fe',
+              borderLeft: '4px solid #0369a1',
+              marginBottom: '12px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              color: '#0c4a6e',
+              fontWeight: '500',
+              opacity: 0.9
             }}>
-              <h3 style={{ marginTop: 0, marginBottom: 16, color: '#0c4a6e', fontFamily: 'Poppins' }}>
-                📊 Analysis Results
-              </h3>
+              ⏳ {generatingMessage}
+            </div>
+          )}
 
-              {feasibilityData && (
-                <div style={{ marginBottom: 16, padding: 12, backgroundColor: 'white', borderRadius: 8, border: '1px solid #e0e7ff' }}>
-                  <h4 style={{ marginTop: 0, marginBottom: 8, color: '#3730a3' }}>Feasibility Assessment</h4>
-                  <div style={{ fontSize: '14px', color: '#475569' }}>
-                    <div><strong>Score:</strong> {feasibilityData.final_score || 'N/A'}%</div>
-                    <div><strong>Status:</strong> {feasibilityData.viability_status || 'N/A'}</div>
-                    {feasibilityData.summary && (
-                      <div style={{ marginTop: 8, lineHeight: 1.5 }}>
-                        <strong>Summary:</strong> {feasibilityData.summary}
-                      </div>
+          {/* Result Display */}
+          {chatComplete && activeResult && (
+            <div data-result-panel style={{
+              padding: '20px',
+              backgroundColor: '#f8fafc',
+              borderTop: '1px solid #e2e8f0',
+              maxHeight: '600px',
+              overflowY: 'auto',
+              fontFamily: 'Poppins, sans-serif'
+            }}>
+              {activeResult === "summary" && summaryResult && (
+                <div>
+                  <h4 style={{ marginTop: 0, color: '#1e293b' }}>📄 Research Summary</h4>
+                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {typeof summaryResult === 'string' ? summaryResult : JSON.stringify(summaryResult, null, 2)}
+                  </div>
+                </div>
+              )}
+
+              {activeResult === "roadmap" && roadmapResult && (
+                <div>
+                  <h4 style={{ marginTop: 0, color: '#1e293b' }}>🗺️ Implementation Roadmap</h4>
+                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: 1.6 }}>
+                    {roadmapResult.error ? (
+                      <div style={{ color: '#dc2626' }}>Error: {roadmapResult.error}</div>
+                    ) : (
+                      <>
+                        <div><strong>Timeline:</strong> {roadmapResult.timeline || 'N/A'}</div>
+                        <div style={{ marginTop: 12 }}>
+                          <strong>Phases ({roadmapResult.phases?.length || 0}):</strong>
+                          {roadmapResult.phases?.slice(0, 5).map((phase, idx) => (
+                            <div key={idx} style={{ marginTop: 8, paddingLeft: 12, borderLeft: '3px solid #3b82f6' }}>
+                              <strong>{phase.name}</strong>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginTop: 4 }}>
+                                Duration: {phase.duration}
+                              </div>
+                            </div>
+                          ))}
+                          {roadmapResult.phases?.length > 5 && (
+                            <div style={{ marginTop: 8, color: '#64748b', fontSize: '12px' }}>
+                              +{roadmapResult.phases.length - 5} more phases
+                            </div>
+                          )}
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
               )}
 
-              {roadmapData && (
-                <div style={{ marginBottom: 16, padding: 12, backgroundColor: 'white', borderRadius: 8, border: '1px solid #dcfce7' }}>
-                  <h4 style={{ marginTop: 0, marginBottom: 8, color: '#166534' }}>Implementation Roadmap</h4>
-                  <div style={{ fontSize: '14px', color: '#475569' }}>
-                    <div><strong>Timeline:</strong> {roadmapData.timeline || 'N/A'}</div>
-                    <div><strong>Phases:</strong> {roadmapData.phases?.length || 0}</div>
-                    {roadmapData.phases && roadmapData.phases.length > 0 && (
-                      <div style={{ marginTop: 8, fontSize: '12px' }}>
-                        {roadmapData.phases.slice(0, 3).map((phase, idx) => (
-                          <div key={idx} style={{ marginBottom: 4, paddingLeft: 8, borderLeft: '2px solid #10b981' }}>
-                            <strong>{phase.name}:</strong> {phase.duration}
+              {activeResult === "feasibility" && feasibilityResult && (
+                <div>
+                  <h4 style={{ marginTop: 0, color: '#1e293b' }}>✓ Feasibility Analysis</h4>
+                  <div style={{ fontSize: '14px', color: '#475569', lineHeight: 1.6 }}>
+                    {feasibilityResult.error ? (
+                      <div style={{ color: '#dc2626' }}>Error: {feasibilityResult.error}</div>
+                    ) : (
+                      <>
+                        {(feasibilityResult.final_score !== undefined || feasibilityResult.feasibility_score !== undefined) && (
+                          <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#ecfdf5', borderRadius: '6px', border: '1px solid #86efac' }}>
+                            <span style={{ fontWeight: '600', color: '#047857' }}>Feasibility Score: </span>
+                            <span style={{ fontSize: '18px', fontWeight: '700', color: '#059669' }}>
+                              {feasibilityResult.final_score || feasibilityResult.feasibility_score}%
+                            </span>
                           </div>
-                        ))}
-                        {roadmapData.phases.length > 3 && (
-                          <div style={{ marginTop: 4, color: '#6b7280' }}>+{roadmapData.phases.length - 3} more phases</div>
                         )}
-                      </div>
+                        {feasibilityResult.viability_status && (
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Status:</strong> {feasibilityResult.viability_status}
+                          </div>
+                        )}
+                        {feasibilityResult.sub_scores && (
+                          <div style={{ marginBottom: '16px' }}>
+                            <div style={{ fontWeight: '600', marginBottom: '8px' }}>Sub-Scores:</div>
+                            <div style={{ paddingLeft: '12px' }}>
+                              {Object.entries(feasibilityResult.sub_scores).map(([key, value]) => (
+                                <div key={key} style={{ marginBottom: '4px', fontSize: '13px' }}>
+                                  <span style={{ fontWeight: '500', textTransform: 'capitalize' }}>{key.replace(/_/g, ' ')}: </span>
+                                  {typeof value === 'object' ? value.score : value}%
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(feasibilityResult.detailed_report || feasibilityResult.explanation || feasibilityResult.summary) && (
+                          <div style={{ marginTop: 12, padding: 12, backgroundColor: 'white', borderRadius: 6, border: '1px solid #e2e8f0', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
+                            <strong>Report:</strong>
+                            <div style={{ marginTop: 6 }}>{feasibilityResult.detailed_report || feasibilityResult.explanation || feasibilityResult.summary}</div>
+                          </div>
+                        )}
+                        {feasibilityResult.recommendations && feasibilityResult.recommendations.length > 0 && (
+                          <div style={{ marginTop: 16 }}>
+                            <div style={{ fontWeight: '600', marginBottom: '8px' }}>Recommendations:</div>
+                            <ul style={{ paddingLeft: '20px', margin: '0' }}>
+                              {feasibilityResult.recommendations.map((rec, idx) => (
+                                <li key={idx} style={{ marginBottom: '6px', fontSize: '13px' }}>{rec}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -509,68 +677,18 @@ export default function LaymanChatPage() {
                 onClick={startNewChat}
                 style={{
                   width: '100%',
+                  marginTop: 16,
                   padding: '10px',
                   borderRadius: '8px',
-                  backgroundColor: '#0ea5e9',
+                  backgroundColor: '#64748b',
                   color: 'white',
                   border: 'none',
                   cursor: 'pointer',
                   fontWeight: '600',
-                  fontSize: '14px',
-                  marginTop: 12
+                  fontSize: '14px'
                 }}
               >
-                ↻ Start New Analysis
-              </button>
-            </div>
-          )}
-
-          {/* Navigation Options When Chat Locked (No Results Yet) */}
-          {chatLocked && !showSummary && !isGenerating && (
-            <div style={{
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'center',
-              padding: '20px',
-              backgroundColor: '#f0fdf4',
-              borderTop: '1px solid #dcfce7',
-              flexWrap: 'wrap'
-            }}>
-              <button
-                onClick={() => window.location.href = '/Roadmap'}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  transition: 'background-color 0.3s'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#10b981'}
-              >
-                → Generate Roadmap
-              </button>
-              <button
-                onClick={() => window.location.href = '/feasibility'}
-                style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  backgroundColor: '#3b82f6',
-                  color: 'white',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  fontSize: '14px',
-                  transition: 'background-color 0.3s'
-                }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#1d4ed8'}
-                onMouseOut={(e) => e.target.style.backgroundColor = '#3b82f6'}
-              >
-                → Analyze Feasibility
+                ↻ Start New Chat
               </button>
             </div>
           )}
