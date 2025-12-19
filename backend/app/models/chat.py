@@ -7,7 +7,6 @@ class SenderType(str, enum.Enum):
     user = "user"
     assistant = "assistant"
 
-
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
 

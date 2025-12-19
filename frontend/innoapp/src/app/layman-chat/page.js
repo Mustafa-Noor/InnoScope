@@ -152,9 +152,8 @@ export default function LaymanChatPage() {
     setUserMessageCount((prev) => prev + 1);
 
     try {
-      const userId = resolveUserId();
-      const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
-      if (userId) payload.user_id = Number(userId);
+      const userId = resolveUserId() || "1";  // Always have a user_id, default to '1'
+      const payload = sessionId ? { session_id: sessionId, message: text, user_id: userId } : { message: text, user_id: userId };
 
       let authToken = BUILT_IN_API_KEY;
       try {

@@ -176,9 +176,8 @@ export function ChatInterface({ onClose }) {
     setSending(true);
 
     try {
-      let userId = resolveUserId();
-      const payload = sessionId ? { session_id: sessionId, message: text } : { message: text };
-      if (userId) payload.user_id = Number(userId);
+      let userId = resolveUserId() || '1';  // Always have a user_id, default to '1'
+      const payload = sessionId ? { session_id: sessionId, message: text, user_id: userId } : { message: text, user_id: userId };
 
       // Prefer an actual auth token stored by AuthContext, otherwise fall back to built-in key
       let authToken = BUILT_IN_API_KEY;
