@@ -13,34 +13,28 @@ export function AuthProvider({ children }) {
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem('token');
-        // If no token found, inject a dummy token and dummy user for local development/testing.
-        // This makes the app behave as if a user is already logged in.
-        if (!token) {
-          const DUMMY_TOKEN = 'dummy-local-token';
-          const DUMMY_USER = { id: 'local-user', email: 'local@dev', first_name: 'Local', last_name: 'Tester', name: 'Local Tester' };
+        
+        if (token) {
+          // Token exists - user is logged in
+          // Parse user from token if possible, or use a default
           try {
-            localStorage.setItem('token', DUMMY_TOKEN);
-            // persist dummy user so other components (chat) can read the id
-            localStorage.setItem('user', JSON.stringify(DUMMY_USER));
-            setUser(DUMMY_USER);
+            const parts = token.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              const DUMMY_USER = { 
+                id: payload.sub || 'user', 
+                email: payload.email || 'user@app', 
+                first_name: 'User', 
+                last_name: 'Account', 
+                name: 'User Account' 
+              };
+              setUser(DUMMY_USER);
+            }
           } catch (e) {
-            console.warn('Unable to write dummy token to localStorage', e);
+            // If can't parse JWT, use generic user
+            const DUMMY_USER = { id: 'user', email: 'user@app', first_name: 'User', last_name: 'Account', name: 'User Account' };
+            setUser(DUMMY_USER);
           }
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch(`${API_BASE}/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUser(data);
-        } else {
-          localStorage.removeItem('token'); // invalid token
         }
       } catch (error) {
         console.error('Auth check failed:', error);
@@ -69,13 +63,24 @@ export function AuthProvider({ children }) {
       // Store only token
       localStorage.setItem('token', data.access_token);
 
-      // Fetch user data
-      const meRes = await fetch(`${API_BASE}/auth/me`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-      });
-      const userData = await meRes.json();
-      setUser(userData);
-      try { localStorage.setItem('user', JSON.stringify(userData)); } catch (e) { /* ignore */ }
+      // Set user from token payload
+      try {
+        const parts = data.access_token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const DUMMY_USER = { 
+            id: payload.sub || 'user', 
+            email: data.email || 'user@app', 
+            first_name: userData?.firstName || 'User', 
+            last_name: userData?.lastName || 'Account', 
+            name: `${userData?.firstName || 'User'} ${userData?.lastName || 'Account'}` 
+          };
+          setUser(DUMMY_USER);
+          try { localStorage.setItem('user', JSON.stringify(DUMMY_USER)); } catch (e) { /* ignore */ }
+        }
+      } catch (e) {
+        console.warn('Could not parse token:', e);
+      }
 
       return { success: true };
     } catch (error) {

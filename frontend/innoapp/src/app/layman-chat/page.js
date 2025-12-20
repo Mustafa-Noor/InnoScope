@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { callMcpTool, getToken, callMcpToolAndParseSSE } from "../../utils/mcp-client";
 
 const createWelcomeMessage = () => ({
   id: `welcome-${Date.now()}`,
@@ -66,17 +67,14 @@ export default function LaymanChatPage() {
   };
 
   const fetchSessions = async () => {
-    const userId = resolveUserId() || "1";
+    const token = getToken();
+    if (!token) {
+      setSessions([]);
+      return;
+    }
     try {
-      const url = new URL(`${API_BASE}/chat/sessions`);
-      url.searchParams.set("user_id", userId);
-      const res = await fetch(url.toString());
-      if (!res.ok) {
-        setSessions([]);
-        return;
-      }
-      const data = await res.json();
-      setSessions(Array.isArray(data) ? data : []);
+      const result = await callMcpTool("innoscope_get_chat_sessions", { token });
+      setSessions(Array.isArray(result) ? result : []);
     } catch (err) {
       console.error("Error fetching sessions", err);
       setSessions([]);
@@ -94,13 +92,13 @@ export default function LaymanChatPage() {
     setGeneratingProgress(0);
     setGeneratingMessage("");
     try {
-      const userId = resolveUserId() || "1";
-      const url = new URL(`${API_BASE}/chat/sessions/${sid}/messages`);
-      url.searchParams.set("user_id", userId);
-      const res = await fetch(url.toString());
-      if (!res.ok) return;
-      const data = await res.json();
-      const formatted = (data || []).map((m, idx) => ({
+      const token = getToken();
+      if (!token) return;
+      const result = await callMcpTool("innoscope_get_session_messages", {
+        token,
+        session_id: sid
+      });
+      const formatted = (result || []).map((m, idx) => ({
         id: m.id ?? `${sid}-${idx}`,
         sender: m.sender === "assistant" ? "ai" : m.sender,
         text: m.message || "",
@@ -152,48 +150,22 @@ export default function LaymanChatPage() {
     setUserMessageCount((prev) => prev + 1);
 
     try {
-      const userId = resolveUserId() || "1";  // Always have a user_id, default to '1'
-      const payload = sessionId ? { session_id: sessionId, message: text, user_id: userId } : { message: text, user_id: userId };
+      const token = getToken();
+      const payload = {
+        token,
+        message: text,
+        ...(sessionId && { session_id: sessionId })
+      };
 
-      let authToken = BUILT_IN_API_KEY;
-      try {
-        const storedToken = localStorage.getItem("token");
-        if (storedToken) authToken = storedToken;
-      } catch (e) {
-        /* ignore */
-      }
+      const data = await callMcpTool("innoscope_send_chat_message", payload);
 
-      const headers = { "Content-Type": "application/json" };
-      if (authToken) headers.Authorization = `Bearer ${authToken}`;
-
-      let res;
-      try {
-        res = await fetch(`${API_BASE}/chat/send-message`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payload),
-        });
-      } catch (networkErr) {
-        try {
-          res = await fetch(`${API_BASE}/dev/chat/send-message`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-        } catch (devErr) {
-          throw networkErr;
-        }
-      }
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const errText = data?.detail || `Server error: ${res.status}`;
+      if (!data) {
         setMessages((prev) => [
           ...prev,
           {
-            id: `err-${Date.now()}`,
+            id: `ai-${Date.now()}`,
             sender: "ai",
-            text: `Sorry, I couldn't process that. ${errText}`,
+            text: "Sorry, no response received.",
             timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           },
         ]);
@@ -247,13 +219,12 @@ export default function LaymanChatPage() {
     if (!extractedData?.summary) return;
     setGeneratingResult("summary");
     try {
-      const res = await fetch(`${API_BASE}/summarize/text`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: extractedData.summary }),
+      const token = getToken();
+      const result = await callMcpTool('innoscope_summarize_text', {
+        token,
+        text: extractedData.summary
       });
-      const data = await res.json();
-      setSummaryResult(data.summary || "No summary generated");
+      setSummaryResult(result?.summary || "No summary generated");
       setActiveResult("summary");
       // Scroll to results
       setTimeout(() => {
@@ -270,48 +241,26 @@ export default function LaymanChatPage() {
   const generateRoadmap = async () => {
     if (!extractedData?.summary) return;
     setGeneratingResult("roadmap");
+    setGeneratingProgress(0);
+    setGeneratingMessage("");
+    
     try {
-      const res = await fetch(`${API_BASE}/roadmap/generate-from-summary-stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ summary: extractedData.summary }),
+      const token = getToken();
+      const events = await callMcpToolAndParseSSE("generate_roadmap_from_summary", {
+        token,
+        summary: extractedData.summary
       });
 
-      const reader = res.body.getReader();
       let result = null;
-      let buffer = "";
-      let currentEvent = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += new TextDecoder().decode(value);
-        const lines = buffer.split("\n");
-        
-        // Keep the last incomplete line in the buffer
-        buffer = lines[lines.length - 1];
-        
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i];
-          
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && currentEvent) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              if (currentEvent === "complete") {
-                result = json;
-              } else if (currentEvent === "status") {
-                // Show progress updates in UI
-                console.log(`[Roadmap] ${json.stage || 'working'}: ${json.message} (${json.progress || 0}%)`);
-                setGeneratingProgress(json.progress || 0);
-                setGeneratingMessage(json.message || `Processing... ${json.progress || 0}%`);
-              }
-            } catch (e) {}
-          }
+      events.forEach(event => {
+        if (event.type === "status") {
+          setGeneratingProgress(event.data.progress || 0);
+          setGeneratingMessage(event.data.message || "");
+          console.log(`[Roadmap] ${event.data.stage || 'working'}: ${event.data.message} (${event.data.progress || 0}%)`);
+        } else if (event.type === "complete" || event.data?.status === "success") {
+          result = event.data;
         }
-      }
+      });
 
       setRoadmapResult(result);
       setActiveResult("roadmap");
@@ -330,48 +279,26 @@ export default function LaymanChatPage() {
   const generateFeasibility = async () => {
     if (!extractedData?.summary) return;
     setGeneratingResult("feasibility");
+    setGeneratingProgress(0);
+    setGeneratingMessage("");
+    
     try {
-      const res = await fetch(`${API_BASE}/feasibility/assess-from-summary-stream`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ summary: extractedData.summary }),
+      const token = getToken();
+      const events = await callMcpToolAndParseSSE("generate_feasibility_from_summary", {
+        token,
+        summary: extractedData.summary
       });
 
-      const reader = res.body.getReader();
       let result = null;
-      let buffer = "";
-      let currentEvent = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += new TextDecoder().decode(value);
-        const lines = buffer.split("\n");
-        
-        // Keep the last incomplete line in the buffer
-        buffer = lines[lines.length - 1];
-        
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i];
-          
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith("data: ") && currentEvent) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              if (currentEvent === "complete") {
-                result = json;
-              } else if (currentEvent === "status") {
-                // Show progress updates in UI
-                console.log(`[Feasibility] ${json.stage || 'working'}: ${json.message} (${json.progress || 0}%)`);
-                setGeneratingProgress(json.progress || 0);
-                setGeneratingMessage(json.message || `Processing... ${json.progress || 0}%`);
-              }
-            } catch (e) {}
-          }
+      events.forEach(event => {
+        if (event.type === "status") {
+          setGeneratingProgress(event.data.progress || 0);
+          setGeneratingMessage(event.data.message || "");
+          console.log(`[Feasibility] ${event.data.stage || 'working'}: ${event.data.message} (${event.data.progress || 0}%)`);
+        } else if (event.type === "complete" || event.data?.status === "success") {
+          result = event.data;
         }
-      }
+      });
 
       setFeasibilityResult(result);
       setActiveResult("feasibility");

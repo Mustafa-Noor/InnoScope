@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import jsPDF from 'jspdf';
+import { callMcpTool, getToken, callMcpToolAndParseSSE } from '../../utils/mcp-client';
 
 const API_BASE_RAW = process.env.NEXT_PUBLIC_API_BASE_URL;
 const API_BASE = (API_BASE_RAW || '').toString().replace(/\/+$/g, '');
@@ -98,90 +99,46 @@ export default function FeasibilityPage() {
     setCurrentProgress(0);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      console.log('Starting feasibility analysis for file:', file.name);
-      const res = await fetch(`${API_BASE}/feasibility/generate-stream`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        console.error('Response not OK:', res.status, res.statusText);
-        alert('Feasibility analysis failed. Please try again.');
+      const token = getToken();
+      if (!token) {
+        alert('Please log in first');
         setIsAnalyzing(false);
         return;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      console.log('Starting feasibility analysis for file:', file.name);
+
+      // Call MCP tool with streaming SSE parsing - pass File object directly
+      const events = await callMcpToolAndParseSSE('innoscope_assess_feasibility_from_file_stream', {
+        token,
+        file: file  // Pass File object directly
+      });
+
       let finalData = null;
       let eventCount = 0;
-      let lastEvent = null;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          console.log('Stream reading completed, received', eventCount, 'events');
-          console.log('Last event before completion:', lastEvent);
-          break;
+      events.forEach(event => {
+        eventCount++;
+        console.log('Event', eventCount, ':', event.type, event.data);
+        
+        // Update progress bar
+        if (event.data?.progress !== undefined) {
+          setCurrentProgress(event.data.progress);
         }
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-
-        // Process complete lines (split by empty line or by individual data: lines)
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i].trim();
-          
-          // Skip empty lines
-          if (!line) continue;
-          
-          // Look for data: lines (SSE simple format)
-          if (line.startsWith('data:')) {
-            const dataLine = line.replace('data:', '').trim();
-            if (!dataLine) continue;
-            
-            try {
-              const eventData = JSON.parse(dataLine);
-              eventCount++;
-              lastEvent = eventData;
-              console.log('Event', eventCount, ':', eventData.stage || 'unknown', eventData);
-              
-              // Update progress bar
-              if (eventData.progress !== undefined) {
-                setCurrentProgress(eventData.progress);
-              }
-
-              // Update loading stages
-              if (eventData.message) {
-                setLoadingStages(prev => [...prev, eventData.message]);
-              }
-
-              // Check if this is the complete event
-              if (eventData.stage === 'complete') {
-                finalData = eventData.result || eventData;
-                console.log('Complete event received with data:', finalData);
-              }
-            } catch (e) {
-              console.warn('Could not parse SSE data:', dataLine, 'Error:', e.message);
-            }
-          }
+        // Update loading stages
+        if (event.data?.message) {
+          setLoadingStages(prev => [...prev, event.data.message]);
         }
 
-        // Keep incomplete line in buffer
-        buffer = lines[lines.length - 1];
-      }
+        // Check if this is the complete event (either type='complete' or status='success')
+        if (event.type === 'complete' || event.data?.status === 'success') {
+          finalData = event.data;
+          console.log('Complete event received with data:', finalData);
+        }
+      });
 
-      console.log('Final data after streaming:', finalData);
-      
-      // If no explicit complete event was received, use the last event if it has result data
-      if (!finalData && lastEvent && lastEvent.result) {
-        console.log('Using last event result as final data:', lastEvent.result);
-        finalData = lastEvent.result;
-      }
+      console.log('Final data after parsing:', finalData);
       
       if (finalData) {
         // Transform the response to match our FeasibilityData structure

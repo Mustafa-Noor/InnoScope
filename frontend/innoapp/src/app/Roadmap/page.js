@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react'
 import jsPDF from 'jspdf';
+import { callMcpTool, getToken, callMcpToolAndParseSSE } from '../../utils/mcp-client';
 // Normalize API base and remove any trailing slashes to avoid double-slash URLs
 const API_BASE_RAW = process.env.NEXT_PUBLIC_API_BASE_URL;
 const API_BASE = (API_BASE_RAW || '').toString().replace(/\/+$/g, '');
@@ -88,88 +89,44 @@ export default function RoadmapPage() {
   const generateRoadmapWithFile = async (fileToProcess) => {
     setIsGenerating(true);
     setIsStreaming(true);
-    setStatusUpdates([{ message: 'Starting upload to server...', progress: 0 }]);
+    setStatusUpdates([{ message: 'Starting roadmap generation...', progress: 0 }]);
     setStreamProgress(0);
     
     try {
-      const formData = new FormData();
-      formData.append('file', fileToProcess);
-      
-      const response = await fetch(`${API_BASE}/roadmap/generate-stream`, {
-        method: 'POST',
-        body: formData,
+      const token = getToken();
+      if (!token) {
+        alert('No token found');
+        return;
+      }
+
+      // Call MCP tool with streaming
+      const events = await callMcpToolAndParseSSE('innoscope_generate_roadmap_from_file_stream', {
+        token,
+        file: fileToProcess
       });
 
-      if (!response.ok || !response.body) {
-        console.log('Response not ok:', response);
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
       let finalResult = null;
 
-      const pushStatus = (msg, prog) => {
-        setStatusUpdates((prev) => [...prev, { message: msg, progress: prog }]);
-        if (typeof prog === 'number') setStreamProgress(prog);
-      };
-
-      const handleComplete = (payload) => {
-        if (!payload) return;
-        finalResult = payload;
-      };
-
-      const processChunk = (textChunk) => {
-        buffer += textChunk;
-        const parts = buffer.split('\n\n');
-        buffer = parts.pop();
-        parts.forEach((part) => {
-          if (!part.trim()) return;
-          let eventType = 'message';
-          let dataLine = '';
-          part.split('\n').forEach((line) => {
-            if (line.startsWith('event:')) {
-              eventType = line.replace('event:', '').trim();
-            } else if (line.startsWith('data:')) {
-              dataLine += line.replace('data:', '').trim();
-            }
-          });
-          if (!dataLine) return;
-          let dataObj = null;
-          try {
-            dataObj = JSON.parse(dataLine);
-          } catch (e) {
-            console.warn('Could not parse SSE data', dataLine);
-            return;
+      events.forEach(event => {
+        if (event.type === 'status' || event.type === 'message') {
+          setStatusUpdates((prev) => [...prev, { 
+            message: event.data?.message || event.data?.stage || 'Working...', 
+            progress: event.data?.progress 
+          }]);
+          if (typeof event.data?.progress === 'number') {
+            setStreamProgress(event.data.progress);
           }
-          if (eventType === 'status') {
-            pushStatus(dataObj.message || 'Working...', dataObj.progress);
-          } else if (eventType === 'error') {
-            pushStatus(dataObj.error || 'Error', undefined);
-          } else if (eventType === 'complete') {
-            handleComplete(dataObj);
-          }
-        });
-      };
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const textChunk = decoder.decode(value, { stream: true });
-        processChunk(textChunk);
-      }
-
-      if (buffer.trim()) {
-        processChunk('\n\n');
-      }
+        } else if (event.type === 'complete' || event.data?.status === 'success') {
+          finalResult = event.data;
+        }
+      });
 
       if (!finalResult) {
         throw new Error('Streaming finished without a complete event');
       }
 
-      if (!finalResult.success) {
-        alert(finalResult.message || 'Failed to generate roadmap');
+      if (!finalResult.success && finalResult.error) {
+        alert(finalResult.error || 'Failed to generate roadmap');
         return;
       }
 
@@ -214,14 +171,7 @@ export default function RoadmapPage() {
     } catch (err) {
       console.error('Error generating roadmap:', err);
       setStatusUpdates((prev) => [...prev, { message: `Error: ${err.message || 'Unknown issue'}`, progress: undefined }]);
-      
-      if (err.message.includes('Failed to fetch')) {
-        alert('Cannot connect to the backend server. Please ensure the backend is running on http://localhost:8000');
-      } else if (err.message.includes('HTTP error')) {
-        alert(`Server error: ${err.message}. Please check the file format and try again.`);
-      } else {
-        alert('Error generating roadmap. Please try again.');
-      }
+      alert('Error generating roadmap. Please try again.');
     } finally {
       setIsGenerating(false);
       setIsStreaming(false);
@@ -391,7 +341,7 @@ export default function RoadmapPage() {
     await generateRoadmapWithFile(firstFile);
   };
 
-  // Handle summarization (calls backend if available, otherwise sets fallback)
+  // Handle summarization using MCP
   const handleSummarize = async () => {
     if (!selectedFolder || files.length === 0) {
       alert('Please select a file first');
@@ -400,29 +350,32 @@ export default function RoadmapPage() {
 
     setIsSummarizing(true);
     try {
-      // Send file directly using FormData
-      const formData = new FormData();
-      formData.append('file', files[0]);
-      
-      const res = await fetch(`${API_BASE}/summarize/file`, {
-        method: 'POST',
-        body: formData,
-        // Note: DO NOT set Content-Type header for FormData - browser will set it automatically
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
+      const token = getToken();
+      console.log('[Roadmap] handleSummarize - token:', token ? 'found' : 'NOT FOUND');
+      if (!token) {
+        alert('No token found. Please check browser console and verify localStorage has "token" set.');
+        setIsSummarizing(false);
+        return;
       }
 
-      const data = await res.json();
-      if (data?.summary) {
-        setRoadmapData((d) => ({ ...(d || {}), summary: data.summary }));
+      // Pass the File object directly to the MCP tool
+      const result = await callMcpTool('innoscope_summarize_file', {
+        token,
+        file: files[0]  // Pass File object directly
+      });
+
+      console.log('[Roadmap] Result from MCP:', result);
+      
+      if (result?.summary) {
+        setRoadmapData((d) => ({ ...(d || {}), summary: result.summary }));
         setShowSummary(true);
         setToastMessage('✅ Summarization complete!');
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
+      } else if (result?.error) {
+        alert('Error: ' + result.error);
       } else {
-        alert('No summary returned');
+        alert('No summary returned. Response: ' + JSON.stringify(result));
       }
     } catch (error) {
       console.error('Error summarizing:', error);
@@ -513,60 +466,36 @@ export default function RoadmapPage() {
     setCurrentProgress(0);
     setFeasibilityData(null);
 
-    const formData = new FormData();
-    formData.append('file', files[0]);
-
     try {
-      const res = await fetch(`${API_BASE}/feasibility/generate-stream`, {
-        method: 'POST',
-        body: formData,
+      const token = getToken();
+      if (!token) {
+        alert('No token found');
+        return;
+      }
+
+      // Call MCP tool with streaming
+      const events = await callMcpToolAndParseSSE('innoscope_assess_feasibility_from_file', {
+        token,
+        file: files[0]
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
       let finalData = null;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i];
-          if (line.startsWith('event:')) {
-            const eventType = line.replace('event:', '').trim();
-            if (i + 1 < lines.length && lines[i + 1].startsWith('data:')) {
-              const dataStr = lines[i + 1].replace('data:', '').trim();
-              try {
-                const data = JSON.parse(dataStr);
-                if (eventType === 'status') {
-                  if (data.message) {
-                    setLoadingStages((prev) => [...prev, data.message]);
-                  }
-                  if (typeof data.progress === 'number') {
-                    setCurrentProgress(data.progress);
-                  }
-                } else if (eventType === 'complete') {
-                  finalData = data;
-                }
-              } catch (e) {
-                console.warn('Could not parse SSE data', dataStr);
-              }
-            }
+      events.forEach(event => {
+        if (event.type === 'status' || event.type === 'message') {
+          if (event.data?.message) {
+            setLoadingStages((prev) => [...prev, event.data.message]);
           }
+          if (typeof event.data?.progress === 'number') {
+            setCurrentProgress(event.data.progress);
+          }
+        } else if (event.type === 'complete' || event.data?.status === 'success') {
+          finalData = event.data;
         }
-        buffer = lines[lines.length - 1];
-      }
+      });
 
       if (!finalData) {
-        throw new Error('No data received from server');
+        throw new Error('No data received from analysis');
       }
 
       setFeasibilityData(finalData);
