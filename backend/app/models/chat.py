@@ -11,7 +11,7 @@ class ChatSession(Base):
     __tablename__ = "chat_sessions"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False)  # No FK - supports MCP user IDs
+    user_id = Column(String, nullable=False)  # String to support MCP user IDs
     topic = Column(String(100))
     title = Column(String(255))
     memory = Column(Text, nullable=True)
