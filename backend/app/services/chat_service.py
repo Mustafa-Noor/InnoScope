@@ -19,14 +19,14 @@ async def handle_chat(
     
     # Extract user_id from request (MCP provides as string)
     if request.user_id:
-        try:
-            user_id = int(request.user_id)  # Convert string to int
-        except (ValueError, TypeError):
-            raise HTTPException(status_code=400, detail="Invalid user_id format")
+        # Validate user_id format - must be non-empty string
+        if not request.user_id or not request.user_id.strip():
+            raise HTTPException(status_code=400, detail="user_id is in invalid format")
+        user_id = request.user_id
     elif current_user:
-        user_id = current_user.id  # Fallback to authenticated user
+        user_id = str(current_user.id)  # Fallback to authenticated user (convert to string)
     else:
-        user_id = 1  # Default fallback for testing/MCP without explicit user_id
+        user_id = "1"  # Default fallback for testing/MCP without explicit user_id (as string)
     
     # 1. Get or create chat session
     # Treat missing, null, or non-positive session_id as a new session

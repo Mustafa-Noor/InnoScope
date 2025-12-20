@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -9,7 +9,7 @@ class SenderType(str, Enum):
 
 
 class ChatSessionCreate(BaseModel):
-    user_id: int
+    user_id: str
     topic: Optional[str]
     title: Optional[str]
 
@@ -40,6 +40,17 @@ class ChatRequest(BaseModel):
     message: str
     topic: Optional[str] = None  # Required only on first message
     user_id: Optional[str] = None  # MCP provides as string
+
+    @field_validator('user_id', mode='before')
+    @classmethod
+    def validate_user_id(cls, v):
+        if v is None:
+            return None
+        if not isinstance(v, str):
+            raise ValueError("user_id must be a string")
+        if not v.strip():
+            raise ValueError("user_id cannot be empty")
+        return v
 
 class ChatResponse(BaseModel):
     session_id: int
