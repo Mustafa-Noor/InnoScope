@@ -1039,3 +1039,142 @@ body {
     max-width: 85%;
   }
 }
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  .chat-container {
+    width: 100%;
+    max-width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .chat-sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 280px;
+    min-width: 280px;
+    z-index: 999;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
+  }
+
+  .chat-sidebar.closed {
+    width: 0;
+    min-width: 0;
+  }
+
+  .chat-main {
+    width: 100%;
+    position: relative;
+  }
+
+  .chat-header {
+    padding: 16px 12px;
+  }
+
+  .messages-area {
+    max-height: calc(100vh - 180px);
+  }
+
+  .chat-input-form {
+    padding: 12px;
+  }
+
+  .input-wrapper {
+    gap: 8px;
+  }
+
+  .chat-input,
+  .send-btn {
+    font-size: 16px;
+  }
+
+  .chat-input {
+    padding: 10px 12px;
+  }
+
+  .send-btn {
+    padding: 10px 12px;
+  }
+
+  [data-result-panel] {
+    max-height: 50vh !important;
+  }
+
+  .nav-links {
+    gap: 12px;
+  }
+
+  .btn-signin {
+    padding: 8px 16px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 12px;
+  }
+
+  .header-content {
+    padding: 16px 12px;
+  }
+
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .nav-links {
+    gap: 8px;
+  }
+
+  .chat-header {
+    padding: 12px 8px;
+  }
+
+  .chat-header h2 {
+    font-size: 18px;
+    margin: 0;
+  }
+
+  .chat-input-form {
+    padding: 8px;
+  }
+
+  .input-wrapper {
+    gap: 4px;
+  }
+
+  .chat-input {
+    padding: 8px 10px;
+    font-size: 16px;
+  }
+
+  .send-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  [data-result-panel] {
+    padding: 12px !important;
+    max-height: 45vh !important;
+  }
+
+  .sidebar-header h3 {
+    font-size: 14px;
+  }
+
+  .new-chat-btn {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}

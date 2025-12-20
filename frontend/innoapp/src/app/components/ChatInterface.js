@@ -3,6 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { callMcpTool, getToken, callMcpToolAndParseSSE } from '../../utils/mcp-client';
 
+const isMobile = () => {
+  if (typeof window === 'undefined') return false;
+  return window.innerWidth <= 768;
+};
+
 const createWelcomeMessage = () => ({
   id: `welcome-${Date.now()}`,
   text: "Hello! I'm your AI research assistant. How can I help you with your research today?",
@@ -67,7 +72,7 @@ export function ChatInterface({ onClose }) {
 
   const [messages, setMessages] = useState(() => [createWelcomeMessage()]);
   const [inputValue, setInputValue] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(!isMobile());
   const [sessions, setSessions] = useState([]);
   const [sessionId, setSessionId] = useState(null);
   const [sending, setSending] = useState(false);
@@ -76,7 +81,16 @@ export function ChatInterface({ onClose }) {
   const listRef = useRef(null);
 
   useEffect(() => {
+    // Handle window resize to close sidebar on mobile
+    const handleResize = () => {
+      if (isMobile()) {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
     fetchSessions();
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -125,6 +139,12 @@ export function ChatInterface({ onClose }) {
     setGeneratingResult(null);
     setGeneratingProgress(0);
     setGeneratingMessage('');
+    
+    // Close sidebar on mobile after selecting a session
+    if (isMobile()) {
+      setIsSidebarOpen(false);
+    }
+    
     try {
       const result = await callMcpTool('innoscope_get_session_messages', {
         token,
@@ -862,9 +882,41 @@ export function ChatInterface({ onClose }) {
       <div className="chat-container">
         {/* Sidebar */}
         <aside className={`chat-sidebar ${isSidebarOpen ? 'open' : 'closed'}`}>
-          <div className="sidebar-header">
-            <h3>Chat History ({sessions.length})</h3>
+          <div className="sidebar-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+            <h3 style={{ margin: 0, flex: 1 }}>Chat History ({sessions.length})</h3>
             <button className="new-chat-btn" onClick={startNewChat} type="button">+ New Chat</button>
+            {isMobile() && (
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                title="Close sidebar"
+                style={{
+                  padding: '6px 8px',
+                  backgroundColor: 'transparent',
+                  color: '#6b7280',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '18px',
+                  transition: 'all 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = '#fee2e2';
+                  e.target.style.color = '#dc2626';
+                  e.target.style.borderColor = '#fca5a5';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.color = '#6b7280';
+                  e.target.style.borderColor = '#d1d5db';
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
           <div className="sessions-list">
             {sessions.length === 0 ? (
