@@ -10,12 +10,11 @@ export function Header() {
               <path d="M7 16h10"/>
             </svg>
           </div>
-          <span className="brand-name">ResearchAnalytica</span>
+          <span className="brand-name">InnoScope</span>
         </div>
         <nav className="nav-links">
-          <a href="#features" className="nav-link">Features</a>
-          <a href="#about" className="nav-link">About</a>
-          <button className="btn-signin">Sign In</button>
+          <a href="" className="nav-link">Chat</a>
+          <button className="btn-signin">Upload</button>
         </nav>
       </div>
     </header>

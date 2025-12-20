@@ -3,7 +3,7 @@ export function Footer() {
     <footer className="footer">
       <div className="container footer-content">
         <p className="footer-copyright">
-          © 2025 ResearchAnalytica. All rights reserved.
+          © 2025 InnoScope. All rights reserved.
         </p>
         <div className="footer-links">
           <a href="#privacy" className="footer-link">Privacy Policy</a>

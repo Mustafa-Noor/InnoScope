@@ -907,7 +907,7 @@ export default function RoadmapPage() {
               </div>
             )}
 
-          {/* Generate Roadmap Button */}
+          {/* Generate Roadmap Button
           <button
             onClick={handleGenerateRoadmap}
             disabled={!selectedFolder || isGenerating}
@@ -941,7 +941,7 @@ export default function RoadmapPage() {
               }
             }}
           >
-            {isGenerating ? (
+            {isGenerating?(
               <>
                 <div style={{
                   width: '20px',
@@ -954,11 +954,8 @@ export default function RoadmapPage() {
                 Generating Roadmap...
               </>
             ) : (
-              <>
-                Generate Implementation Roadmap
-              </>
             )}
-          </button>
+          </button> */}
 
           {/* Thinking / status box below the main button */}
           {showThinkingBox && (
