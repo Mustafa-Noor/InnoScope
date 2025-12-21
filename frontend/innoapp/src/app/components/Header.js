@@ -1,124 +1,181 @@
 import React from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Menu, X } from "lucide-react";
+import { useState } from "react";
 
-// CSS for Header component (replaces Tailwind)
+// CSS for Header component - aligned with app design system
 const headerStyles = `
 .custom-header {
-  border-bottom: 1px solid rgba(39,39,42,0.5);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
   position: sticky;
   top: 0;
-  z-index: 50;
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(6px);
-  transition: background 0.3s;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  transition: all 0.3s ease;
 }
+
 .custom-header .header-inner {
-  max-width: 1120px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 20px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
+
 .custom-header .logo-flex {
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.custom-header .logo-gradient-bg {
-  position: relative;
-}
-.custom-header .logo-gradient-bg .gradient-blur {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, #a78bfa, #06b6d4);
-  border-radius: 8px;
-  filter: blur(8px);
-  opacity: 0.75;
-  z-index: 0;
-}
-.custom-header .logo-gradient-bg .logo-box {
-  position: relative;
-  background: #000;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(168,139,250,0.5);
-  z-index: 1;
+
+.custom-header .logo-icon {
+  width: 44px;
+  height: 44px;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border-radius: 12px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+  color: white;
+  flex-shrink: 0;
 }
+
+.custom-header .logo-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
 .custom-header .brand-title {
-  background: linear-gradient(90deg, #a78bfa, #f472b6, #06b6d4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin-left: 4px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin: 0;
 }
+
 .custom-header .nav-flex {
   display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 32px;
 }
+
 .custom-header .nav-btn {
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: 8px;
   font-weight: 500;
-  font-size: 1rem;
+  font-size: 15px;
   border: none;
-  background: none;
+  background: transparent;
+  color: #64748b;
   cursor: pointer;
-  transition: all 0.18s;
+  transition: all 0.2s ease;
 }
+
+.custom-header .nav-btn:hover {
+  color: #059669;
+}
+
 .custom-header .nav-btn.selected {
-  background: linear-gradient(90deg, #a78bfa, #06b6d4);
-  color: #fff;
-  font-weight: 800;
-  box-shadow: 0 2px 12px 0 rgba(168,139,250,0.18);
-  border: 2px solid #a78bfa;
-  transform: scale(1.05);
-  letter-spacing: 0.03em;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 2px #fff;
+  color: #059669;
+  background: rgba(5, 150, 105, 0.08);
+  font-weight: 600;
 }
-.custom-header .nav-btn:not(.selected):hover {
-  background: #f4f4f5;
-  color: #000;
+
+.custom-header .btn-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 20px;
 }
+
 .custom-header .get-started-btn {
-  padding: 8px 20px;
+  padding: 10px 20px;
   border-radius: 8px;
-  font-weight: 700;
+  font-weight: 500;
   color: #fff;
-  background: linear-gradient(90deg, #a78bfa, #06b6d4);
-  box-shadow: 0 2px 8px 0 rgba(168,139,250,0.18);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
   border: none;
-  margin-left: 8px;
   cursor: pointer;
-  transition: transform 0.18s;
+  transition: all 0.2s ease;
+  font-size: 14px;
 }
+
 .custom-header .get-started-btn:hover {
-  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(5, 150, 105, 0.3);
+  transform: translateY(-1px);
 }
+
 .custom-header .back-btn {
-  padding: 8px 20px;
+  padding: 10px 20px;
   border-radius: 8px;
-  font-weight: 700;
-  color: #fff;
-  background: linear-gradient(90deg, #f97316, #ef4444);
-  box-shadow: 0 2px 8px 0 rgba(239,68,68,0.18);
-  border: none;
-  margin-left: 8px;
+  font-weight: 500;
+  color: #64748b;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(226, 232, 240, 0.6);
   cursor: pointer;
-  transition: transform 0.18s;
+  transition: all 0.2s ease;
+  font-size: 14px;
 }
+
 .custom-header .back-btn:hover {
-  transform: scale(1.05);
+  background: rgba(226, 232, 240, 0.4);
+  color: #0f172a;
 }
+
+.custom-header .menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #0f172a;
+  padding: 8px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.custom-header .menu-btn:hover {
+  background: rgba(226, 232, 240, 0.4);
+}
+
 @media (max-width: 768px) {
   .custom-header .nav-flex {
     display: none;
+  }
+  
+  .custom-header .menu-btn {
+    display: block;
+  }
+  
+  .custom-header .btn-group {
+    margin-left: 0;
+  }
+  
+  .custom-header .mobile-nav {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 12px 0;
+  }
+  
+  .custom-header .mobile-nav .nav-btn {
+    width: 100%;
+    text-align: left;
+    padding: 12px 24px;
+    border-radius: 0;
+  }
+  
+  .custom-header .mobile-nav .nav-btn:hover {
+    background: rgba(5, 150, 105, 0.08);
   }
 }
 `;
@@ -174,6 +231,8 @@ const openUrl = (key) => {
 };
 
 export function Header() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   function handleGetStarted() {
     const LOGOUT_URL =
       (process.env.NEXT_PUBLIC_LOGOUT_URL || "") + "/workflows";
@@ -191,13 +250,10 @@ export function Header() {
       <header className="custom-header">
         <div className="header-inner">
           <div className="logo-flex">
-            <div className="logo-gradient-bg">
-              <div className="gradient-blur"></div>
-              <div className="logo-box">
-                <Sparkles style={{ width: 20, height: 20, color: "#a78bfa" }} />
-              </div>
+            <div className="logo-icon">
+              <Sparkles style={{ width: 24, height: 24 }} />
             </div>
-            <h1 className="brand-title">idealForge AI</h1>
+            <h1 className="brand-title">InnoScope</h1>
           </div>
           <div className="nav-flex">
             {navLinks.map((link) => (
@@ -209,14 +265,42 @@ export function Header() {
                 {link.label}
               </button>
             ))}
+          </div>
+          <div className="btn-group">
             <button onClick={handleGetStarted} className="get-started-btn">
-            Agentic Workflows
+              Agentic Workflows
             </button>
             <button onClick={handleBackToDashboard} className="back-btn">
               Back
             </button>
+            <button
+              className="menu-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X style={{ width: 24, height: 24 }} />
+              ) : (
+                <Menu style={{ width: 24, height: 24 }} />
+              )}
+            </button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="mobile-nav">
+            {navLinks.map((link) => (
+              <button
+                key={link.label}
+                onClick={() => {
+                  openUrl(link.key);
+                  setMobileMenuOpen(false);
+                }}
+                className={`nav-btn${link.selected ? " selected" : ""}`}
+              >
+                {link.label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
     </>
   );
