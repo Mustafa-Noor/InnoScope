@@ -170,7 +170,7 @@ const openUrl = (key) => {
   url.searchParams.set("user_name", userName);
   url.searchParams.set("user_email", userEmail);
   url.searchParams.set("user_id", userId);
-  window.open(url.toString(), "_blank");
+  window.location.href = url.toString();
 };
 
 export function Header() {
@@ -210,7 +210,7 @@ export function Header() {
               </button>
             ))}
             <button onClick={handleGetStarted} className="get-started-btn">
-            Agentic Workflows
+              Agentic Workflows
             </button>
             <button onClick={handleBackToDashboard} className="back-btn">
               Back
