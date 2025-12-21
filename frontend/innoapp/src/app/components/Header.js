@@ -210,7 +210,7 @@ export function Header() {
               </button>
             ))}
             <button onClick={handleGetStarted} className="get-started-btn">
-              Get Started
+            Agentic Workflows
             </button>
             <button onClick={handleBackToDashboard} className="back-btn">
               Back
