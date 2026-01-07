@@ -184,7 +184,7 @@ const navLinks = [
   { label: "Volvox", key: "volvox" },
   { label: "Kick Start", key: "kickstart" },
   { label: "Innoscope", key: "innoscope", selected: true },
-  { label: "Smart Search", key: "smart_search" },
+  { label: "Smart Research", key: "smart_search" },
 ];
 
 function getAuthSessionData() {

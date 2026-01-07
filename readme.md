@@ -12,6 +12,7 @@
 - [Features](#features)
 - [How It Works](#how-it-works)
 - [Project Structure](#project-structure)
+- [Pipeline Architecture - In-Depth](#-pipeline-architecture---in-depth)
 - [Tech Stack](#tech-stack)
 - [Getting Started](#getting-started)
 - [API Endpoints](#api-endpoints)
@@ -339,7 +340,354 @@ InnoScope/
 
 ---
 
-## 🛠️ Tech Stack
+## � Pipeline Architecture - In-Depth
+
+### Overview
+
+InnoScope uses **LangGraph** (state machine framework) to orchestrate multi-step AI pipelines. Each pipeline is a directed acyclic graph (DAG) of processing nodes that transform state objects.
+
+#### Core Technologies
+- **Framework**: LangGraph (StateGraph)
+- **State Management**: Pydantic models
+- **LLM Integration**: Custom LLM wrapper
+- **Streaming**: Server-Sent Events (SSE)
+- **File Processing**: PDF/DOCX extraction
+
+### State-Based Architecture
+
+Every pipeline operates on a **state object** (Pydantic BaseModel) that:
+- Holds input data, intermediate results, and final outputs
+- Flows through nodes sequentially
+- Gets modified by each node
+- Can be serialized/deserialized (JSON-compatible)
+
+---
+
+### 1. 📋 Summarization Pipeline
+
+**Purpose**: Extract text from documents and generate concise summaries
+
+**Flow**:
+```
+File → [Extract Text] → [Cleanup] → [Summarize] → Summary
+```
+
+**Key Features**:
+- Handles PDF/DOCX files
+- Character count validation
+- Markdown cleanup
+- Concise output optimized for downstream pipelines
+
+**Endpoints**:
+- `POST /summarize/text` - Direct text input
+- `POST /summarize/file` - File upload
+
+---
+
+### 2. 🗺️ Roadmap Generation Pipeline
+
+**Purpose**: Generate 8-phase implementation roadmap from research papers/summaries
+
+**Architecture** (3-Stage):
+```
+Document → [Scoping] → [Research] → [Roadmap Generation] → 8-Phase Plan
+```
+
+#### Stage 1: SCOPING
+**Purpose**: Extract and structure document information
+
+**Sub-nodes**:
+1. `extract_text_node`: File → raw text
+2. `summarize_and_extract_node`: Combined LLM call extracts:
+   - Summary
+   - Problem statement
+   - Domain
+   - Goals (list)
+   - Prerequisites (list)
+   - Key topics (list)
+
+#### Stage 2: RESEARCH ENRICHMENT
+**Purpose**: Enrich context with external sources
+
+**Routing Logic** (Heuristic-based):
+- **Wikipedia**: Academic/technical domains, focused goals (1-2)
+- **DuckDuckGo**: Business/market domains, multiple goals (3+)
+
+**Enrichment**:
+- Wikipedia API search + summarization
+- DuckDuckGo search + snippet extraction
+- Token-optimized: uses raw data directly (no extra synthesis)
+
+#### Stage 3: ROADMAP GENERATION
+**Purpose**: Generate structured 8-phase implementation plan
+
+**8 Canonical Phases**:
+1. Prototype Development
+2. Testing & Validation
+3. Funding & Grants
+4. Manufacturing / Implementation
+5. Marketing & Promotion
+6. Launch / Deployment
+7. Maintenance & Iteration
+8. Scaling & Expansion
+
+**Each Phase Includes**:
+- Objective (1 sentence)
+- Key Actions (3-6 bullets)
+- Metrics (2-4 KPIs)
+- Risks & Mitigations (1-3 bullets)
+
+**Progress Milestones**:
+- 0-35%: Scoping
+- 35-75%: Research
+- 75-100%: Roadmap generation
+
+**Endpoints**:
+- `POST /roadmap/generate` - Upload file → roadmap
+- `POST /roadmap/generate-stream` - Streaming version (SSE)
+- `POST /roadmap/generate-from-summary-stream` - From text summary
+
+---
+
+### 3. 📊 Feasibility Assessment Pipeline
+
+**Purpose**: Multi-dimensional feasibility analysis across 5 dimensions
+
+**Architecture**:
+```
+Document → [Scoping] → [5 Dimension Assessments] → [Report] → Score + Report
+```
+
+#### Scoping (0-15%)
+Reuses roadmap scoping to extract structured data
+
+#### 5 Dimension Assessments (15-90%)
+
+**Each dimension is a separate LLM call evaluating 0-100:**
+
+##### 1. Technical Feasibility (25-35%)
+- Tech stack maturity
+- Integration complexity
+- Data requirements
+- Architecture feasibility
+
+##### 2. Resource Feasibility (40-50%)
+- Budget requirements
+- Infrastructure needs
+- Tool availability
+- Licensing costs
+
+##### 3. Skills Feasibility (55-65%)
+- Required expertise level
+- Learning curve
+- Team capability gaps
+- Training needs
+
+##### 4. Scope Feasibility (70-80%)
+- Timeline realism
+- Feature complexity
+- MVP feasibility
+- Scope creep risks
+
+##### 5. Risk Feasibility (85-90%)
+- Technical risks
+- Market risks
+- Regulatory compliance
+- Security concerns
+
+#### Report Generation (95-100%)
+- Average of 5 dimension scores → `final_score`
+- Concatenated explanations → `overall_explanation`
+- Structured markdown report → `detailed_report`
+
+**Final Output Structure**:
+```json
+{
+  "final_score": 73,
+  "sub_scores": {
+    "technical": 80,
+    "resources": 65,
+    "skills": 70,
+    "scope": 75,
+    "risk": 75
+  },
+  "explanation": "Project shows strong technical foundation...",
+  "recommendations": ["Secure budget...", "Hire ML engineer...", "Define MVP..."],
+  "detailed_report": "# Feasibility Analysis\n\n## Technical..."
+}
+```
+
+**Endpoints**:
+- `POST /feasibility/from-chat/{session_id}/stream` - From chat session (streaming)
+
+---
+
+### 4. 💬 Chat Agent Pipeline
+
+**Purpose**: Interactive conversational interface to gather project requirements
+
+**Architecture**:
+```
+User Message → [Extract] → [Find Missing] → {Ask More | Generate Summary}
+```
+
+**Conversation Flow**:
+1. **Extract Fields**: Parse conversation for structured data
+   - Problem statement
+   - Domain
+   - Goals
+   - Prerequisites
+   - Key topics
+
+2. **Find Missing**: Identify incomplete/unclear fields
+
+3. **Router Decision**: 
+   - **Ask**: Generate clarifying question if missing info
+   - **Refine**: Create summary if complete
+
+4. **Compose Summary**: Create initial structured summary
+
+5. **Refine**: Polish summary into research-style prose
+
+6. **Finalize**: Mark completion and enable roadmap/feasibility
+
+**Turn Management**:
+- Force completion after 2 message pairs
+- Smart routing based on completeness
+- Database persistence for multi-turn conversations
+
+**Frontend Integration**:
+```javascript
+const response = await callMcpTool("innoscope_send_chat_message", {
+    token,
+    message: userMessage,
+    session_id: existingSessionId  // optional
+});
+
+if (response.is_complete) {
+    // Show summary, enable roadmap/feasibility buttons
+    setExtractedData({
+        summary: response.summary,
+        domain: response.domain,
+        goals: response.goals
+    });
+}
+```
+
+**Endpoints**:
+- `POST /chat/send-message` - Process user message
+- `GET /chat/sessions` - List user's chat sessions
+- `GET /chat/sessions/{session_id}/messages` - Get session history
+
+---
+
+### State Management Hierarchy
+
+```
+BaseModel (Pydantic)
+    │
+    ├── IntermediateState (base for all pipelines)
+    │      ├── raw_text
+    │      ├── problem_statement
+    │      ├── domain
+    │      ├── goals
+    │      ├── prerequisites
+    │      ├── key_topics
+    │      └── summary
+    │
+    ├── CombinedState extends IntermediateState
+    │      ├── research: ResearchState
+    │      └── roadmap: str
+    │
+    ├── ChatState extends IntermediateState
+    │      ├── memory_text
+    │      ├── reply_text
+    │      ├── missing_fields
+    │      └── completed
+    │
+    └── FeasibilityAssessmentState
+           ├── technical_feasibility: SubScore
+           ├── resource_feasibility: SubScore
+           ├── skills_feasibility: SubScore
+           ├── scope_feasibility: SubScore
+           ├── risk_feasibility: SubScore
+           ├── final_score: int
+           └── detailed_report: str
+```
+
+### SSE Event Handling
+
+**Event Format**:
+```
+event: status
+data: {"stage": "scoping", "message": "Analyzing...", "progress": 15}
+
+event: complete
+data: {"status": "success", "roadmap": "...", "summary": "..."}
+
+event: error
+data: {"message": "Processing failed"}
+```
+
+**Frontend Processing**:
+```javascript
+const events = await callMcpToolAndParseSSE(toolName, args);
+events.forEach(event => {
+    if (event.type === "status") {
+        setProgress(event.data.progress);
+        setMessage(event.data.message);
+    } else if (event.type === "complete") {
+        setResult(event.data);
+    }
+});
+```
+
+### Performance Optimizations
+
+1. **Token Efficiency**
+   - Combined LLM calls (summary + field extraction in one)
+   - Heuristic routing (logic instead of LLM for source selection)
+   - Raw enrichment (skip synthesis step)
+   - Concise, structured prompts
+
+2. **Streaming UX**
+   - Progressive disclosure via SSE events
+   - Clear progress milestones (0%, 15%, 35%, etc.)
+   - Interruptible processing
+
+3. **State Persistence**
+   - Chat state stored in PostgreSQL
+   - Resume capability from database
+
+4. **Parallel Processing** (Future)
+   - Feasibility dimensions are independent → can run concurrently
+   - Multiple enrichment sources → parallel API calls
+
+### Quick Reference
+
+**Pipeline Summary**:
+
+| Pipeline | Entry | Exit | Key Stages | Streaming |
+|----------|-------|------|------------|-----------|
+| **Summarization** | file_path | summary | extract → summarize | No |
+| **Roadmap** | file_path | roadmap + summary | scoping → research → generate | Yes |
+| **Feasibility** | file_path/summary | score + report | scoping → 5 assessments → report | Yes |
+| **Chat** | user_message | reply + summary | extract → missing → question/compose | No |
+
+**Progress Ranges**:
+
+| Pipeline | Stage | Progress % |
+|----------|-------|------------|
+| Roadmap | Scoping | 0-35% |
+| Roadmap | Research | 35-75% |
+| Roadmap | Generation | 75-100% |
+| Feasibility | Scoping | 0-15% |
+| Feasibility | 5 Assessments | 15-90% |
+| Feasibility | Report | 90-100% |
+
+---
+
+## �🛠️ Tech Stack
 
 ### Backend
 - **Framework**: FastAPI (Python) - High-performance async web framework
@@ -729,4 +1077,4 @@ python app/scripts/generate_embeddings.py
 
 ---
 
-**Last Updated**: December 2025 | **Project Lead**: Team InnoScope
+**Last Updated**: January 2026 | **Project Lead**: Team InnoScope
