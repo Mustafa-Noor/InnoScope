@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap Pipeline Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .back-btn:hover {
+            background: white;
+            color: #667eea;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: white;
+            color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pipeline-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+            font-weight: bold;
+        }
+
+        .pipeline-stages {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .stage {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            border: 3px solid transparent;
+            transition: all 0.5s ease;
+        }
+
+        .stage.active {
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            transform: scale(1.05);
+        }
+
+        .stage.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stage-icon {
+            font-size: 2.5rem;
+        }
+
+        .stage-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .stage-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .stage-description {
+            opacity: 0.9;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .stage-nodes {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .node {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0.6;
+            transition: all 0.3s ease;
+        }
+
+        .node.active {
+            opacity: 1;
+            background: rgba(74, 222, 128, 0.3);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .node.completed {
+            opacity: 1;
+            background: rgba(34, 197, 94, 0.2);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.02);
+            }
+        }
+
+        .flow-arrows {
+            display: flex;
+            justify-content: space-between;
+            margin: -15px 0;
+            position: relative;
+        }
+
+        .arrow {
+            font-size: 3rem;
+            opacity: 0.3;
+            transition: all 0.5s ease;
+        }
+
+        .arrow.active {
+            opacity: 1;
+            animation: slideRight 1s ease-in-out infinite;
+        }
+
+        @keyframes slideRight {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            50% {
+                transform: translateX(10px);
+            }
+        }
+
+        .data-flow {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .data-flow h3 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+
+        .data-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .data-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .data-label {
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .data-value {
+            opacity: 0.9;
+            max-width: 60%;
+            text-align: right;
+        }
+
+        .output-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            border: 2px solid #4ade80;
+            display: none;
+        }
+
+        .output-box.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .output-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .output-icon {
+            font-size: 2rem;
+        }
+
+        .roadmap-phases {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .phase-item {
+            background: rgba(74, 222, 128, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #4ade80;
+        }
+
+        .phase-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .phase-detail {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status-message.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Roadmap Pipeline Animation</h1>
+            <p>Watch how research papers transform into implementation roadmaps</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="pipeline-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar">0%</div>
+            </div>
+
+            <div class="pipeline-stages">
+                <div class="stage" id="stage1">
+                    <div class="stage-header">
+                        <span class="stage-icon">📄</span>
+                        <div>
+                            <div class="stage-number">Stage 1</div>
+                            <div class="stage-title">Scoping</div>
+                        </div>
+                    </div>
+                    <p class="stage-description">Extract and structure document information</p>
+                    <div class="stage-nodes">
+                        <div class="node" id="node-extract">📥 Extract Text</div>
+                        <div class="node" id="node-summarize">📝 Summarize & Extract</div>
+                    </div>
+                </div>
+
+                <div class="stage" id="stage2">
+                    <div class="stage-header">
+                        <span class="stage-icon">🔍</span>
+                        <div>
+                            <div class="stage-number">Stage 2</div>
+                            <div class="stage-title">Research</div>
+                        </div>
+                    </div>
+                    <p class="stage-description">Enrich context with external sources</p>
+                    <div class="stage-nodes">
+                        <div class="node" id="node-route">🚦 Route Decision</div>
+                        <div class="node" id="node-enrich">🌐 Wiki/DDG Enrichment</div>
+                        <div class="node" id="node-consolidate">📋 Consolidate</div>
+                    </div>
+                </div>
+
+                <div class="stage" id="stage3">
+                    <div class="stage-header">
+                        <span class="stage-icon">🗺️</span>
+                        <div>
+                            <div class="stage-number">Stage 3</div>
+                            <div class="stage-title">Roadmap</div>
+                        </div>
+                    </div>
+                    <p class="stage-description">Generate 8-phase implementation plan</p>
+                    <div class="stage-nodes">
+                        <div class="node" id="node-generate">✨ Generate Roadmap</div>
+                        <div class="node" id="node-structure">📊 Structure Phases</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flow-arrows">
+                <span class="arrow" id="arrow1">→</span>
+                <span class="arrow" id="arrow2">→</span>
+            </div>
+
+            <div class="data-flow" id="dataFlow">
+                <h3>📊 Current State Data</h3>
+                <div class="data-item" id="data-raw">
+                    <span class="data-label">Raw Text:</span>
+                    <span class="data-value">Waiting...</span>
+                </div>
+                <div class="data-item" id="data-summary">
+                    <span class="data-label">Summary:</span>
+                    <span class="data-value">Not generated</span>
+                </div>
+                <div class="data-item" id="data-domain">
+                    <span class="data-label">Domain:</span>
+                    <span class="data-value">Not extracted</span>
+                </div>
+                <div class="data-item" id="data-goals">
+                    <span class="data-label">Goals:</span>
+                    <span class="data-value">Not extracted</span>
+                </div>
+                <div class="data-item" id="data-research">
+                    <span class="data-label">Research:</span>
+                    <span class="data-value">Not enriched</span>
+                </div>
+            </div>
+
+            <div class="output-box" id="outputBox">
+                <div class="output-header">
+                    <span class="output-icon">✅</span>
+                    <h3>Final Roadmap Generated!</h3>
+                </div>
+                <div class="roadmap-phases">
+                    <div class="phase-item">
+                        <div class="phase-title">1. Prototype Development</div>
+                        <div class="phase-detail">Build MVP with core features</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">2. Testing & Validation</div>
+                        <div class="phase-detail">Verify functionality and performance</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">3. Funding & Grants</div>
+                        <div class="phase-detail">Secure financial resources</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">4. Manufacturing / Implementation</div>
+                        <div class="phase-detail">Scale production or deployment</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">5. Marketing & Promotion</div>
+                        <div class="phase-detail">Build awareness and demand</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">6. Launch / Deployment</div>
+                        <div class="phase-detail">Go-to-market execution</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">7. Maintenance & Iteration</div>
+                        <div class="phase-detail">Continuous improvement</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">8. Scaling & Expansion</div>
+                        <div class="phase-detail">Grow and reach new markets</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage">
+                🎉 Roadmap pipeline completed successfully!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const steps = [
+            { progress: 5, message: 'Starting pipeline...', duration: 1000 },
+            { progress: 15, stage: 1, node: 'node-extract', arrow: null, data: { raw: '15,000 characters extracted from research paper' }, duration: 2000 },
+            { progress: 25, stage: 1, node: 'node-summarize', arrow: null, data: { summary: 'AI-powered summarization complete', domain: 'Computer Vision, Healthcare', goals: '3 goals identified' }, duration: 2500 },
+            { progress: 35, stage: 1, complete: true, arrow: 'arrow1', duration: 1000 },
+            { progress: 45, stage: 2, node: 'node-route', arrow: null, data: {}, duration: 1500 },
+            { progress: 55, stage: 2, node: 'node-enrich', arrow: null, data: { research: 'Wikipedia + DDG: 5 relevant sources' }, duration: 2500 },
+            { progress: 65, stage: 2, node: 'node-consolidate', arrow: null, data: { research: 'Research consolidated: 2,500 words' }, duration: 2000 },
+            { progress: 75, stage: 2, complete: true, arrow: 'arrow2', duration: 1000 },
+            { progress: 85, stage: 3, node: 'node-generate', arrow: null, data: {}, duration: 2500 },
+            { progress: 95, stage: 3, node: 'node-structure', arrow: null, data: {}, duration: 2000 },
+            { progress: 100, stage: 3, complete: true, showOutput: true, duration: 1500 }
+        ];
+
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function activateStage(stageNum) {
+            document.querySelectorAll('.stage').forEach(s => {
+                s.classList.remove('active');
+            });
+            if (stageNum) {
+                const stage = document.getElementById('stage' + stageNum);
+                stage.classList.add('active');
+            }
+        }
+
+        function completeStage(stageNum) {
+            const stage = document.getElementById('stage' + stageNum);
+            stage.classList.add('completed');
+            stage.classList.remove('active');
+        }
+
+        function activateNode(nodeId) {
+            document.querySelectorAll('.node').forEach(n => {
+                n.classList.remove('active');
+            });
+            if (nodeId) {
+                const node = document.getElementById(nodeId);
+                node.classList.add('active');
+                setTimeout(() => {
+                    node.classList.add('completed');
+                }, 1000);
+            }
+        }
+
+        function activateArrow(arrowId) {
+            document.querySelectorAll('.arrow').forEach(a => {
+                a.classList.remove('active');
+            });
+            if (arrowId) {
+                const arrow = document.getElementById(arrowId);
+                arrow.classList.add('active');
+            }
+        }
+
+        function updateData(data) {
+            if (data.raw) {
+                const elem = document.getElementById('data-raw');
+                elem.classList.add('visible');
+                elem.querySelector('.data-value').textContent = data.raw;
+            }
+            if (data.summary) {
+                const elem = document.getElementById('data-summary');
+                elem.classList.add('visible');
+                elem.querySelector('.data-value').textContent = data.summary;
+            }
+            if (data.domain) {
+                const elem = document.getElementById('data-domain');
+                elem.classList.add('visible');
+                elem.querySelector('.data-value').textContent = data.domain;
+            }
+            if (data.goals) {
+                const elem = document.getElementById('data-goals');
+                elem.classList.add('visible');
+                elem.querySelector('.data-value').textContent = data.goals;
+            }
+            if (data.research) {
+                const elem = document.getElementById('data-research');
+                elem.classList.add('visible');
+                elem.querySelector('.data-value').textContent = data.research;
+            }
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            updateProgress(step.progress);
+
+            if (step.stage) {
+                activateStage(step.stage);
+            }
+
+            if (step.node) {
+                activateNode(step.node);
+            }
+
+            if (step.arrow) {
+                activateArrow(step.arrow);
+            }
+
+            if (step.data) {
+                updateData(step.data);
+            }
+
+            if (step.complete) {
+                completeStage(step.stage);
+            }
+
+            if (step.showOutput) {
+                document.getElementById('outputBox').classList.add('visible');
+                document.getElementById('statusMessage').classList.add('visible');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            updateProgress(0);
+            document.querySelectorAll('.stage').forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+            document.querySelectorAll('.node').forEach(n => {
+                n.classList.remove('active', 'completed');
+            });
+            document.querySelectorAll('.arrow').forEach(a => {
+                a.classList.remove('active');
+            });
+            document.querySelectorAll('.data-item').forEach(d => {
+                d.classList.remove('visible');
+                d.querySelector('.data-value').textContent = d.querySelector('.data-label').textContent.includes('Raw') ? 'Waiting...' : 'Not generated';
+            });
+            document.getElementById('outputBox').classList.remove('visible');
+            document.getElementById('statusMessage').classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>

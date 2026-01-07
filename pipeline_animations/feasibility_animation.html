@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feasibility Pipeline Animation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 50%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #334155;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            color: #059669;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.2s;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-btn:hover {
+            background: #ecfdf5;
+            border-color: #10b981;
+            color: #059669;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .pipeline-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+
+        .graph-layout {
+            position: relative;
+            min-height: 900px;
+            margin-bottom: 30px;
+            overflow: visible;
+            perspective: 1000px;
+        }
+
+        .zoom-container {
+            width: 100%;
+            height: 100%;
+            transition: all 1.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center top;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .zoom-container.overview {
+            transform: scale(1) translateX(0);
+        }
+
+        .agent-graph {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #ecfdf5 100%);
+            border-radius: 12px;
+            padding: 30px 40px;
+            display: flex;
+            flex-direction: row;
+            gap: 80px;
+            border: 1px solid #a7f3d0;
+            flex-shrink: 0;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            overflow: visible;
+        }
+
+        .agent-graph::before {
+            content: '';
+            position: absolute;
+            left: 90px;
+            right: 90px;
+            top: 50%;
+            height: 3px;
+            background: linear-gradient(90deg, #10b981, #059669);
+            transform: translateY(-50%);
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .agent-node {
+            background: white;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            padding: 10px;
+        }
+
+        .agent-node.active {
+            border-color: #10b981;
+            border-width: 3px;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            transform: scale(2.5);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            animation: zoom-pulse 1.5s ease-in-out;
+            z-index: 100;
+            position: relative;
+        }
+
+        .agent-node.active .agent-title,
+        .agent-node.active .agent-title span {
+            color: white;
+        }
+
+        @keyframes zoom-pulse {
+            0% { transform: scale(1.15); z-index: 100; }
+            50% { transform: scale(2.6); z-index: 100; }
+            100% { transform: scale(2.5); z-index: 100; }
+        }
+
+        .agent-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            }
+            50% {
+                box-shadow: 0 12px 40px rgba(16, 185, 129, 0.7);
+            }
+        }
+
+        .agent-title {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .agent-title span:first-child {
+            font-size: 28px;
+        }
+
+        .agent-description {
+            display: none;
+        }
+
+        .agent-details {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            border: 1px solid #047857;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            flex: 1;
+            margin-top: 20px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: all 0.6s ease;
+        }
+
+        .agent-details.visible {
+            opacity: 1;
+            transform: scale(1);
+            max-height: 2000px;
+        }
+
+        .detail-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 12px;
+            letter-spacing: -0.01em;
+        }
+
+        .sub-nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .sub-node {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+            border-radius: 8px;
+            padding: 14px 12px;
+            border: 2px solid #d1fae5;
+            transition: all 0.3s ease;
+            color: #1f2937;
+            will-change: opacity, transform;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sub-node::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            right: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #10b981, #059669, transparent);
+            border-radius: 8px 8px 0 0;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .sub-node.active::before {
+            opacity: 1;
+            animation: flow-right 2s linear infinite;
+        }
+
+        @keyframes flow-right {
+            0% { left: -100%; right: 100%; }
+            100% { left: 100%; right: -100%; }
+        }
+
+        .sub-node.active {
+            border-color: #10b981;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+            background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+            border-width: 2px;
+            transform: scale(1.02);
+        }
+
+        .sub-node.active .sub-node-title,
+        .sub-node.active .sub-node-status {
+            color: #059669;
+        }
+
+        .sub-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .sub-node-icon {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .sub-node-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #0f172a;
+            line-height: 1.3;
+        }
+
+        .sub-node-status {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        .node-data-display {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+            order: 2;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .node-data-display.visible {
+            display: block;
+            animation: fadeInScale 0.4s ease-out;
+        }
+
+        .node-data-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .node-data-content {
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        .data-item {
+            background: rgba(16, 185, 129, 0.05);
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #10b981;
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #10b981;
+            margin-bottom: 6px;
+            font-size: 1.1rem;
+        }
+
+        .data-value {
+            color: #1f2937;
+            font-family: 'Courier New', monospace;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e2e8f0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+            font-weight: 600;
+        }
+
+        .scoping-stage {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border: 3px solid transparent;
+            transition: all 0.5s ease;
+        }
+
+        .scoping-stage.active {
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .stage-icon {
+            font-size: 2.5rem;
+        }
+
+        .stage-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .dimensions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .dimension-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            border: 3px solid transparent;
+            transition: all 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dimension-card.active {
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            transform: scale(1.05);
+        }
+
+        .dimension-card.completed {
+            border-color: #059669;
+            opacity: 0.85;
+        }
+
+        .dimension-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .dimension-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .dimension-description {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .score-display {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+
+        .score-display.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4ade80;
+        }
+
+        .score-bar {
+            height: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+            width: 0%;
+            transition: width 1s ease;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            }
+            50% {
+                box-shadow: 0 8px 32px rgba(16, 185, 129, 0.7);
+            }
+        }
+
+        .report-section {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .report-section.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .report-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .final-score-display {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .final-score-label {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .final-score-value {
+            font-size: 4rem;
+            font-weight: bold;
+            color: #4ade80;
+            margin-bottom: 10px;
+        }
+
+        .score-status {
+            font-size: 1.3rem;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+
+        .score-status.excellent {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+        }
+
+        .score-status.good {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        }
+
+        .score-status.fair {
+            background: linear-gradient(135deg, #fb923c, #f97316);
+        }
+
+        .score-status.poor {
+            background: linear-gradient(135deg, #f87171, #dc2626);
+        }
+
+        .recommendations-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .recommendation-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #f5576c;
+        }
+
+        .recommendation-icon {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status-message.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .processing-indicator {
+            text-align: center;
+            padding: 15px;
+            font-size: 14px;
+            background: white;
+            border-radius: 10px;
+            color: #475569;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .processing-indicator.visible {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>📊 Feasibility Pipeline Animation</h1>
+            <p>ML-powered project viability assessment with semantic research</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="pipeline-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar">0%</div>
+            </div>
+
+            <div class="processing-indicator" id="processingMsg"></div>
+
+            <div class="graph-layout">
+                <div class="zoom-container overview" id="zoomContainer">
+                    <!-- Left: Agent Graph -->
+                    <div class="agent-graph">
+                    <div class="agent-node" id="agent-extraction">
+                        <div class="agent-title">
+                            <span>📄</span>
+                            <span>Field Extraction Agent</span>
+                        </div>
+                        <div class="agent-description">Converts project info to 25+ structured parameters</div>
+                    </div>
+
+                    <div class="agent-node" id="agent-ml">
+                        <div class="agent-title">
+                            <span>🤖</span>
+                            <span>ML Prediction Agent</span>
+                        </div>
+                        <div class="agent-description">Runs trained model on extracted features</div>
+                    </div>
+
+                    <div class="agent-node" id="agent-semantic">
+                        <div class="agent-title">
+                            <span>📚</span>
+                            <span>Semantic Search Agent</span>
+                        </div>
+                        <div class="agent-description">Finds relevant research papers from arXiv</div>
+                    </div>
+
+                    <div class="agent-node" id="agent-llm">
+                        <div class="agent-title">
+                            <span>🧠</span>
+                            <span>LLM Assessment Agent</span>
+                        </div>
+                        <div class="agent-description">Multi-dimensional feasibility analysis</div>
+                    </div>
+
+                    <div class="agent-node" id="agent-synthesis">
+                        <div class="agent-title">
+                            <span>⚡</span>
+                            <span>Synthesis Agent</span>
+                        </div>
+                        <div class="agent-description">Combines ML + semantic + LLM insights</div>
+                    </div>
+                </div>
+
+                <!-- Right: Agent Details -->
+                <div class="agent-details" id="agentDetails">
+                    <div style="order: 1;">
+                        <div class="detail-header">Agent Sub-Nodes</div>
+                        <div id="subNodesContainer"></div>
+                        <div class="node-data-display" id="nodeDataDisplay">
+                            <div class="node-data-title" id="nodeDataTitle"></div>
+                            <div class="node-data-content" id="nodeDataContent"></div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <div class="dimensions-grid" style="display: none;">
+                <div class="dimension-card" id="dim-ml">
+                    <span class="dimension-icon">🤖</span>
+                    <div class="dimension-title">ML Model Prediction</div>
+                    <p class="dimension-description">
+                        Trained model analyzes 25+ parameters from dataset to predict feasibility score
+                    </p>
+                    <div class="score-display" id="score-ml">
+                        <div class="score-label">ML Score</div>
+                        <div class="score-value">0</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill"></div>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.8;">
+                            Confidence: <span id="ml-confidence">0%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dimension-card" id="dim-semantic">
+                    <span class="dimension-icon">📚</span>
+                    <div class="dimension-title">Semantic Search</div>
+                    <p class="dimension-description">
+                        Finding relevant research papers from arXiv based on project domain and topics
+                    </p>
+                    <div class="score-display" id="score-semantic">
+                        <div class="score-label">Papers Found</div>
+                        <div class="score-value">0</div>
+                        <div style="margin-top: 10px; font-size: 0.85rem; opacity: 0.8;">
+                            Relevance: <span id="semantic-relevance">High</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dimension-card" id="dim-technical">
+                    <span class="dimension-icon">⚙️</span>
+                    <div class="dimension-title">Technical Analysis</div>
+                    <p class="dimension-description">
+                        LLM assessment of technical feasibility, stack maturity, and complexity
+                    </p>
+                    <div class="score-display" id="score-technical">
+                        <div class="score-label">Score</div>
+                        <div class="score-value">0</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dimension-card" id="dim-resource">
+                    <span class="dimension-icon">💰</span>
+                    <div class="dimension-title">Resource Analysis</div>
+                    <p class="dimension-description">
+                        LLM evaluation of budget, infrastructure, and resource availability
+                    </p>
+                    <div class="score-display" id="score-resource">
+                        <div class="score-label">Score</div>
+                        <div class="score-value">0</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dimension-card" id="dim-skills">
+                    <span class="dimension-icon">👥</span>
+                    <div class="dimension-title">Skills Analysis</div>
+                    <p class="dimension-description">
+                        LLM assessment of required expertise and team capability gaps
+                    </p>
+                    <div class="score-display" id="score-skills">
+                        <div class="score-label">Score</div>
+                        <div class="score-value">0</div>
+                        <div class="score-bar">
+                            <div class="score-bar-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dimension-card" id="dim-scope">
+                    <span class="dimension-icon">🎯</span>
+                    <div class="dimension-title">Scope Analysis</div>
+                    <p class="dimension-description">
+                        LLM evaluation of timeline realism and feature complexity
+                    </p>
+                    <div class="score-display" id="score-scope">
+                        <div class="score-label">Score</div>
+                        <div class="score-value">0</div>
+                        <div class="score-bar">
+                            <div class="score-bar-� Relevant Research Papers</h3>
+                <div class="recommendations-list" style="margin-bottom: 30px;">
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">📄</span>
+                        <strong>Deep Learning for Medical Imaging:</strong> State-of-the-art CNNs achieve 95% accuracy (Relevance: 0.94)
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">📄</span>
+                        <strong>Transfer Learning in Healthcare AI:</strong> Pre-trained models reduce training time by 60% (Relevance: 0.89)
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">📄</span>
+                        <strong>Explainable AI for Clinical Decision:</strong> Interpretability frameworks for medical AI (Relevance: 0.87)
+                    </div>
+                </div>
+
+                <h3 style="margin-bottom: 15px;">💡 AI-Generated Recommendations</h3>
+                <div class="recommendations-list">
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">🤖</span>
+                        <strong>ML Insight:</strong> Project parameters match 87% of successful historical projects in dataset
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">💡</span>
+                        <strong>Technical:</strong> Leverage transfer learning from pre-trained medical imaging models
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">💡</span>
+                        <strong>Resources:</strong> GPU infrastructure critical - consider cloud ML platforms (AWS SageMaker, GCP AI)
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">💡</span>
+                        <strong>Skills:</strong> Hire ML engineer with healthcare domain experience and medical data annotation team
+                    </div>
+                    <div class="recommendation-item">
+                        <span class="recommendation-icon">💡</span>
+                        <strong>Risk:</strong> FDA/medical compliance and patient data privacy (HIPAA) are critical considerations
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage">
+                🎉 Feasibility assessment completed successfully!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const agentSubNodes = {
+            extraction: [
+                { id: 'parse', icon: '📝', title: 'Parse Input', status: 'Extract text content' },
+                { id: 'llm-extract', icon: '🔍', title: 'LLM Extraction', status: 'Extract 25+ fields' },
+                { id: 'validate', icon: '✓', title: 'Validate Fields', status: 'Check completeness' }
+            ],
+            ml: [
+                { id: 'preprocess', icon: '⚙️', title: 'Preprocess Data', status: 'Normalize features' },
+                { id: 'predict', icon: '🎯', title: 'Model Prediction', status: 'Run inference' },
+                { id: 'confidence', icon: '📊', title: 'Confidence Score', status: 'Calculate certainty' }
+            ],
+            semantic: [
+                { id: 'query-gen', icon: '💭', title: 'Query Generation', status: 'Create search queries' },
+                { id: 'arxiv-search', icon: '🔎', title: 'arXiv Search', status: 'Search papers' },
+                { id: 'rank', icon: '⭐', title: 'Relevance Ranking', status: 'Score & filter papers' }
+            ],
+            llm: [
+                { id: 'technical', icon: '⚙️', title: 'Technical Feasibility', status: 'Assess tech viability' },
+                { id: 'resource', icon: '💰', title: 'Resource Analysis', status: 'Check resources' },
+                { id: 'skills', icon: '👥', title: 'Skills Assessment', status: 'Evaluate team' },
+                { id: 'scope', icon: '🎯', title: 'Scope Analysis', status: 'Validate timeline' },
+                { id: 'risk', icon: '⚠️', title: 'Risk Identification', status: 'Find risks' }
+            ],
+            synthesis: [
+                { id: 'aggregate', icon: '📥', title: 'Aggregate Scores', status: 'Combine all inputs' },
+                { id: 'generate', icon: '📄', title: 'Generate Report', status: 'Create recommendations' },
+                { id: 'format', icon: '✨', title: 'Format Output', status: 'Structure response' }
+            ]
+        };
+
+        const nodeDataExplanations = {
+            'parse': {
+                title: '📝 Document Parsing',
+                data: [
+                    { label: 'Process', value: 'Extracts raw text from submitted PDF/DOCX/TXT using PyPDF2 or python-docx, handling multi-page documents up to 50 pages' }
+                ]
+            },
+            'llm-extract': {
+                title: '🔍 Structured Field Extraction',
+                data: [
+                    { label: 'Process', value: 'Uses instruction-tuned model with JSON schema validation to extract 25+ fields including domain, budget, team size, timeline, tech stack, and objectives' }
+                ]
+            },
+            'validate': {
+                title: '✓ Field Validation',
+                data: [
+                    { label: 'Process', value: 'Verifies extracted fields meet required format and completeness (>80%), requesting clarification for missing critical data (domain, budget, timeline)' }
+                ]
+            },
+            'preprocess': {
+                title: '⚙️ Feature Preprocessing',
+                data: [
+                    { label: 'Process', value: 'Normalizes 25 numerical features using StandardScaler, encodes categorical variables (domain, tech stack) via one-hot encoding, resulting in 87-dimensional vector' }
+                ]
+            },
+            'predict': {
+                title: '🎯 Model Inference',
+                data: [
+                    { label: 'Process', value: 'Runs XGBoost gradient boosting model (trained on 500+ historical projects) to predict feasibility score 0-100, using ensemble of 100 trees with 0.1 learning rate' }
+                ]
+            },
+            'confidence': {
+                title: '📊 Confidence Calculation',
+                data: [
+                    { label: 'Process', value: 'Computes prediction confidence from model uncertainty (tree variance) and feature quality score, outputting percentage 0-100% indicating prediction reliability' }
+                ]
+            },
+            'query-gen': {
+                title: '💭 Search Query Generation',
+                data: [
+                    { label: 'Process', value: 'Generates 3 targeted search queries from project domain and topics, e.g., "medical image classification convolutional neural networks"' }
+                ]
+            },
+            'arxiv-search': {
+                title: '🔎 arXiv Database Search',
+                data: [
+                    { label: 'Process', value: 'Searches arXiv.org via semantic vector search in Qdrant database using cosine similarity on embeddings, finding 47 papers from last 3 years' }
+                ]
+            },
+            'rank': {
+                title: '⭐ Relevance Ranking',
+                data: [
+                    { label: 'Process', value: 'Ranks papers using hybrid algorithm: 70% semantic similarity + 30% citation count, selecting top 5 papers with 0.89 average relevance score' }
+                ]
+            },
+            'technical': {
+                title: '⚙️ Technical Feasibility Analysis',
+                data: [
+                    { label: 'Analysis Result', value: 'Score 82/100 - Technology stack is mature and well-supported with extensive libraries available (e.g., PyTorch, TensorFlow for medical imaging)' }
+                ]
+            },
+            'resource': {
+                title: '💰 Resource Feasibility Analysis',
+                data: [
+                    { label: 'Analysis Result', value: 'Score 68/100 - Resources adequate but tight, with GPU compute costs (~$5K/month) identified as primary budget concern' }
+                ]
+            },
+            'skills': {
+                title: '👥 Skills Feasibility Analysis',
+                data: [
+                    { label: 'Analysis Result', value: 'Score 73/100 - Team has most needed skills but requires 1-2 additional ML engineers with medical imaging experience' }
+                ]
+            },
+            'scope': {
+                title: '🎯 Scope Feasibility Analysis',
+                data: [
+                    { label: 'Analysis Result', value: 'Score 76/100 - Scope is ambitious but achievable, though 6-month timeline is tight and 8-10 months recommended for full system' }
+                ]
+            },
+            'risk': {
+                title: '⚠️ Risk Analysis',
+                data: [
+                    { label: 'Analysis Result', value: 'Score 74/100 - Moderate risk level manageable with mitigation, with FDA approval and HIPAA compliance identified as critical blockers' }
+                ]
+            },
+            'aggregate': {
+                title: '📥 Score Aggregation',
+                data: [
+                    { label: 'Process', value: 'Combines ML score (78/100, 87% confidence), LLM dimension scores (Technical: 82, Resource: 68, Skills: 73, Scope: 76, Risk: 74), and 5 research papers into weighted final score of 75/100' }
+                ]
+            },
+            'generate': {
+                title: '📄 Report Generation',
+                data: [
+                    { label: 'Process', value: 'Synthesizes all scores, paper summaries, and insights into comprehensive report with Executive Summary, Detailed Analysis, Research Papers, and 8 actionable recommendations' }
+                ]
+            },
+            'format': {
+                title: '✨ Output Formatting',
+                data: [
+                    { label: 'Process', value: 'Structures output as FeasibilityAssessmentState (Pydantic) with scores dict, papers list, and recommendations, validated against API contract for SSE streaming' }
+                ]
+            }
+        };
+
+        const dimensionScores = {
+            ml: 78,
+            semantic: 5,
+            technical: 82,
+            resource: 68,
+            skills: 73,
+            scope: 76,
+            risk: 74
+        };
+
+        const steps = [
+            { progress: 5, message: 'Initializing ML-based feasibility pipeline...', duration: 1000 },
+            
+            // Field Extraction Agent
+            { progress: 7, agent: 'extraction', message: '🔍 Zooming into Field Extraction Agent...', duration: 800 },
+            { progress: 8, agent: 'extraction', subNode: 'parse', message: 'Parsing input document...', duration: 1000 },
+            { progress: 12, agent: 'extraction', subNode: 'llm-extract', message: 'Extracting 25+ structured fields...', duration: 1500 },
+            { progress: 15, agent: 'extraction', subNode: 'validate', agentComplete: true, message: 'Field extraction complete ✓', duration: 1000 },
+            
+            // ML Prediction Agent
+            { progress: 17, agent: 'ml', message: '🔍 Zooming into ML Prediction Agent...', duration: 800 },
+            { progress: 18, agent: 'ml', subNode: 'preprocess', message: 'Preprocessing features...', duration: 1200 },
+            { progress: 22, agent: 'ml', subNode: 'predict', message: 'Running ML model inference...', duration: 2000 },
+            { progress: 25, agent: 'ml', subNode: 'confidence', agentComplete: true, dimension: 'ml', score: 78, confidence: 87, message: 'ML prediction complete (Score: 78, Confidence: 87%) ✓', duration: 1500 },
+            
+            // Semantic Search Agent
+            { progress: 27, agent: 'semantic', message: '🔍 Zooming into Semantic Search Agent...', duration: 800 },
+            { progress: 28, agent: 'semantic', subNode: 'query-gen', message: 'Generating search queries...', duration: 1000 },
+            { progress: 32, agent: 'semantic', subNode: 'arxiv-search', message: 'Searching arXiv database...', duration: 2000 },
+            { progress: 35, agent: 'semantic', subNode: 'rank', agentComplete: true, dimension: 'semantic', score: 5, message: 'Found 5 relevant papers ✓', duration: 1500 },
+            
+            // LLM Assessment Agent
+            { progress: 38, agent: 'llm', message: '🔍 Zooming into LLM Assessment Agent...', duration: 800 },
+            { progress: 40, agent: 'llm', subNode: 'technical', dimension: 'technical', score: 82, message: 'LLM analyzing technical feasibility...', duration: 2000 },
+            { progress: 48, agent: 'llm', subNode: 'resource', dimension: 'resource', score: 68, message: 'LLM evaluating resources...', duration: 2000 },
+            { progress: 56, agent: 'llm', subNode: 'skills', dimension: 'skills', score: 73, message: 'LLM analyzing required skills...', duration: 2000 },
+            { progress: 64, agent: 'llm', subNode: 'scope', dimension: 'scope', score: 76, message: 'LLM checking project scope...', duration: 2000 },
+            { progress: 72, agent: 'llm', subNode: 'risk', agentComplete: true, dimension: 'risk', score: 74, message: 'LLM risk analysis complete ✓', duration: 2000 },
+            
+            // Synthesis Agent
+            { progress: 78, agent: 'synthesis', message: '🔍 Zooming into Synthesis Agent...', duration: 800 },
+            { progress: 80, agent: 'synthesis', subNode: 'aggregate', message: 'Aggregating all scores...', duration: 1500 },
+            { progress: 90, agent: 'synthesis', subNode: 'generate', message: 'Generating recommendations...', duration: 2000 },
+            { progress: 100, agent: 'synthesis', subNode: 'format', agentComplete: true, showReport: true, message: 'Analysis complete! ✓', duration: 1500 }
+        ];
+
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function updateMessage(message) {
+            const msgElem = document.getElementById('processingMsg');
+            msgElem.textContent = message;
+            msgElem.classList.add('visible');
+        }
+
+        function showAgentDetails(agentKey) {
+            const container = document.getElementById('subNodesContainer');
+            const nodes = agentSubNodes[agentKey];
+            
+            if (!nodes) return;
+            
+            // Create sub-nodes grid but keep them hidden initially
+            container.innerHTML = `
+                <div class="sub-nodes-grid">
+                    ${nodes.map(node => `
+                        <div class="sub-node" id="subnode-${node.id}" style="display: none; opacity: 0; transform: scale(0.8);">
+                            <div class="sub-node-icon">${node.icon}</div>
+                            <div class="sub-node-title">${node.title}</div>
+                            <div class="sub-node-status">${node.status}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function zoomToAgent(agentKey) {
+            const zoomContainer = document.getElementById('zoomContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            
+            zoomContainer.classList.remove('overview');
+            zoomContainer.classList.add('zoomed-in');
+            
+            setTimeout(() => {
+                agentDetails.classList.add('visible');
+            }, 2500);
+        }
+
+        function zoomOut() {
+            const zoomContainer = document.getElementById('zoomContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            
+            agentDetails.classList.remove('visible');
+            
+            setTimeout(() => {
+                zoomContainer.classList.remove('zoomed-in');
+                zoomContainer.classList.add('overview');
+            }, 600);
+        }
+
+        function activateAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                document.querySelectorAll('.agent-node').forEach(n => {
+                    n.classList.remove('active');
+                    n.style.animation = '';
+                });
+                agentNode.classList.add('active');
+                agentNode.style.animation = 'pulse-glow 2s ease-in-out infinite';
+                showAgentDetails(agentKey);
+                zoomToAgent(agentKey);
+            }
+        }
+
+        function completeAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                agentNode.classList.remove('active');
+                agentNode.style.animation = '';
+                agentNode.classList.add('completed');
+                zoomOut();
+            }
+        }
+
+        function activateSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                // First, make the sub-node visible with animation
+                subNode.style.display = 'block';
+                setTimeout(() => {
+                    subNode.style.opacity = '1';
+                    subNode.style.transform = 'scale(1)';
+                    subNode.style.transition = 'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                }, 50);
+                
+                // Then activate it after appearance animation
+                setTimeout(() => {
+                    document.querySelectorAll('.sub-node').forEach(n => n.classList.remove('active'));
+                    subNode.classList.add('active');
+                    showNodeData(subNodeId);
+                }, 200);
+            }
+        }
+
+        function completeSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                subNode.classList.remove('active');
+                subNode.classList.add('completed');
+            }
+        }
+
+        function showNodeData(subNodeId) {
+            const dataDisplay = document.getElementById('nodeDataDisplay');
+            const dataTitle = document.getElementById('nodeDataTitle');
+            const dataContent = document.getElementById('nodeDataContent');
+            
+            const nodeData = nodeDataExplanations[subNodeId];
+            
+            if (!nodeData) {
+                dataDisplay.classList.remove('visible');
+                return;
+            }
+            
+            dataTitle.textContent = nodeData.title;
+            
+            dataContent.innerHTML = nodeData.data.map(item => `
+                <div class="data-item">
+                    <div class="data-label">${item.label}</div>
+                    <div class="data-value">${item.value}</div>
+                </div>
+            `).join('');
+            
+            dataDisplay.classList.add('visible');
+        }
+
+        function assessDimension(dimension, score, confidence) {
+            const card = document.getElementById('dim-' + dimension);
+            const scoreDisplay = document.getElementById('score-' + dimension);
+            
+            if (!card || !scoreDisplay) return;
+            
+            card.classList.add('active');
+            
+            setTimeout(() => {
+                scoreDisplay.classList.add('visible');
+                const scoreValue = scoreDisplay.querySelector('.score-value');
+                const scoreFill = scoreDisplay.querySelector('.score-bar-fill');
+                
+                // For ML model, show confidence instead of score bar
+                if (dimension === 'ml' && confidence) {
+                    const confidenceElem = document.getElementById('ml-confidence');
+                    if (confidenceElem) {
+                        let currentConf = 0;
+                        const confInterval = setInterval(() => {
+                            currentConf += 2;
+                            if (currentConf >= confidence) {
+                                currentConf = confidence;
+                                clearInterval(confInterval);
+                            }
+                            confidenceElem.textContent = currentConf + '%';
+                        }, 30);
+                    }
+                }
+                
+                // For semantic search, show papers count (not percentage)
+                if (dimension === 'semantic') {
+                    let current = 0;
+                    const interval = setInterval(() => {
+                        current += 1;
+                        if (current >= score) {
+                            current = score;
+                            clearInterval(interval);
+                            card.classList.remove('active');
+                            card.classList.add('completed');
+                        }
+                        scoreValue.textContent = current;
+                    }, 300);
+                    return;
+                }
+                
+                // Animate score counting
+                let current = 0;
+                const increment = score / 20;
+                const interval = setInterval(() => {
+                    current += increment;
+                    if (current >= score) {
+                        current = score;
+                        clearInterval(interval);
+                        card.classList.remove('active');
+                        card.classList.add('completed');
+                    }
+                    scoreValue.textContent = Math.round(current);
+                    if (scoreFill) scoreFill.style.width = current + '%';
+                }, 50);
+            }, 500);
+        }
+
+        function showFinalReport() {
+            const reportSection = document.getElementById('reportSection');
+            reportSection.classList.add('visible');
+            
+            // Calculate average score (excluding semantic which is paper count, not score)
+            const scores = [
+                dimensionScores.ml,
+                dimensionScores.technical,
+                dimensionScores.resource,
+                dimensionScores.skills,
+                dimensionScores.scope,
+                dimensionScores.risk
+            ];
+            const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+            
+            const finalScoreElem = document.getElementById('finalScore');
+            const scoreStatusElem = document.getElementById('scoreStatus');
+            
+            // Animate final score
+            let current = 0;
+            const increment = avgScore / 30;
+            const interval = setInterval(() => {
+                current += increment;
+                if (current >= avgScore) {
+                    current = avgScore;
+                    clearInterval(interval);
+                }
+                finalScoreElem.textContent = Math.round(current);
+            }, 30);
+            
+            // Set status
+            let status, statusClass;
+            if (avgScore >= 80) {
+                status = 'Excellent';
+                statusClass = 'excellent';
+            } else if (avgScore >= 60) {
+                status = 'Good';
+                statusClass = 'good';
+            } else if (avgScore >= 40) {
+                status = 'Fair';
+                statusClass = 'fair';
+            } else {
+                status = 'Poor';
+                statusClass = 'poor';
+            }
+            
+            scoreStatusElem.textContent = status;
+            scoreStatusElem.className = 'score-status ' + statusClass;
+            
+            document.getElementById('statusMessage').classList.add('visible');
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            updateProgress(step.progress);
+            
+            if (step.message) {
+                updateMessage(step.message);
+            }
+            
+            // When activating new agent, zoom in and wait for animation
+            if (step.agent && !step.subNode) {
+                activateAgent(step.agent);
+                await new Promise(resolve => setTimeout(resolve, 2500)); // Wait for zoom
+            }
+            
+            // Sub-node appears with animation
+            if (step.subNode) {
+                activateSubNode(step.subNode);
+                // Keep sub-node active for most of duration
+                await new Promise(resolve => setTimeout(resolve, step.duration * 1.2));
+                completeSubNode(step.subNode);
+                await new Promise(resolve => setTimeout(resolve, step.duration * 0.5));
+            } else if (!step.agent) {
+                await new Promise(resolve => setTimeout(resolve, step.duration));
+            }
+            
+            if (step.agentComplete && step.agent) {
+                completeAgent(step.agent);
+                // Wait for zoom out animation
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
+            if (step.dimension) {
+                assessDimension(step.dimension, step.score, step.confidence);
+            }
+            
+            if (step.showReport) {
+                showFinalReport();
+            }
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            updateProgress(0);
+            document.getElementById('processingMsg').textContent = '';
+            document.getElementById('processingMsg').classList.remove('visible');
+            
+            document.querySelectorAll('.agent-node').forEach(node => {
+                node.classList.remove('active', 'completed');
+            });
+            
+            document.getElementById('subNodesContainer').innerHTML = '';
+            document.getElementById('nodeDataDisplay').classList.remove('visible');
+            
+            document.querySelectorAll('.dimension-card').forEach(card => {
+                card.classList.remove('active', 'completed');
+            });
+            
+            document.querySelectorAll('.score-display').forEach(display => {
+                display.classList.remove('visible');
+                display.querySelector('.score-value').textContent = '0';
+                const scoreFill = display.querySelector('.score-bar-fill');
+                if (scoreFill) scoreFill.style.width = '0%';
+            });
+            
+            const mlConfidence = document.getElementById('ml-confidence');
+            if (mlConfidence) mlConfidence.textContent = '0%';
+            
+            // Reset zoom
+            const zoomContainer = document.getElementById('zoomContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            zoomContainer.classList.remove('zoomed-in');
+            zoomContainer.classList.add('overview');
+            agentDetails.classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Pipeline Animation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 50%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 15px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 12px 24px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            color: #334155;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-btn:hover {
+            background: #f8fafc;
+            transform: translateX(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .pipeline-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .graph-layout {
+            position: relative;
+            min-height: 900px;
+            margin-bottom: 30px;
+            overflow: visible;
+            perspective: 1000px;
+        }
+
+        .zoom-container {
+            width: 100%;
+            height: 100%;
+            transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center top;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .zoom-container.overview {
+            transform: scale(1) translateX(0);
+        }
+
+        .agent-graph {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #ecfdf5 100%);
+            border-radius: 12px;
+            padding: 30px 40px;
+            display: flex;
+            flex-direction: row;
+            gap: 80px;
+            border: 1px solid #a7f3d0;
+            flex-shrink: 0;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            overflow: visible;
+        }
+
+        .agent-graph::before {
+            content: '';
+            position: absolute;
+            left: 90px;
+            right: 90px;
+            top: 50%;
+            height: 3px;
+            background: linear-gradient(90deg, #10b981, #059669);
+            transform: translateY(-50%);
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .agent-node {
+            background: white;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            padding: 10px;
+        }
+
+        .agent-node.active {
+            border-color: #10b981;
+            border-width: 3px;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            transform: scale(2.5);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            animation: zoom-pulse 1.5s ease-in-out;
+            z-index: 100;
+            position: relative;
+        }
+
+        .agent-node.active .agent-title,
+        .agent-node.active .agent-title span {
+            color: white;
+        }
+
+        @keyframes zoom-pulse {
+            0% { transform: scale(1.15); z-index: 100; }
+            50% { transform: scale(2.6); z-index: 100; }
+            100% { transform: scale(2.5); z-index: 100; }
+        }
+
+        .agent-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            }
+            50% {
+                box-shadow: 0 12px 40px rgba(16, 185, 129, 0.7);
+            }
+        }
+
+        .agent-title {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .agent-title span:first-child {
+            font-size: 28px;
+        }
+
+        .agent-description {
+            display: none;
+        }
+
+        .agent-details {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            border: 1px solid #047857;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            flex: 1;
+            margin-top: 20px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: all 0.6s ease;
+        }
+
+        .agent-details.visible {
+            opacity: 1;
+            transform: scale(1);
+            max-height: 2000px;
+        }
+
+        .detail-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 12px;
+            letter-spacing: -0.01em;
+        }
+
+        .sub-nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 25px;
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .sub-nodes-grid::before {
+            content: '';
+            position: absolute;
+            left: 12px;
+            right: 12px;
+            top: 50%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #10b981, transparent);
+            transform: translateY(-50%);
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        .sub-node {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #e2e8f0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #1f2937;
+            position: relative;
+            z-index: 1;
+        }
+
+        .sub-node.active {
+            border-color: #10b981;
+            border-width: 2px;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.9), 0 0 10px rgba(16, 185, 129, 0.5);
+            transform: scale(1.12);
+            background: white;
+            color: #059669;
+            z-index: 10;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% {
+                box-shadow: 0 0 30px rgba(255, 255, 255, 0.9), 0 0 10px rgba(16, 185, 129, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 40px rgba(255, 255, 255, 1), 0 0 20px rgba(16, 185, 129, 0.7);
+            }
+        }
+
+        .sub-node.active .sub-node-title,
+        .sub-node.active .sub-node-status {
+            color: #059669;
+            font-weight: 700;
+        }
+
+        .sub-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .sub-node-icon {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .sub-node-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .sub-node-status {
+            font-size: 0.85rem;
+            opacity: 0.7;
+        }
+
+        .node-data-display {
+            background: white;
+            border: 2px solid #10b981;
+            border-radius: 10px;
+            padding: 20px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+            order: 2;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .node-data-display.visible {
+            display: block;
+            animation: fadeInScale 0.4s ease-out;
+        }
+
+        .node-data-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .node-data-content {
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        .data-item {
+            background: rgba(16, 185, 129, 0.05);
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #10b981;
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #10b981;
+            margin-bottom: 6px;
+            font-size: 1.1rem;
+        }
+
+        .data-value {
+            color: #1f2937;
+            font-family: 'Courier New', monospace;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .processing-indicator {
+            text-align: center;
+            padding: 15px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .final-report {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .final-report.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .report-header {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #10b981;
+        }
+
+        .chat-output {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .chat-message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .user-message {
+            background: rgba(16, 185, 129, 0.2);
+            border-left: 4px solid #10b981;
+        }
+
+        .assistant-message {
+            background: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #059669;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status-message.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>💬 Chat Pipeline Animation</h1>
+            <p>Conversational AI with field extraction</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="pipeline-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar">0%</div>
+            </div>
+
+            <div class="processing-indicator" id="processingMsg"></div>
+
+            <div class="graph-layout">
+                <div class="zoom-container" id="zoomContainer">
+                    <!-- Agent Graph (Horizontal) -->
+                    <div class="agent-graph">
+                        <div class="agent-node" id="agent-conversation">
+                            <div class="agent-title">
+                                <span>💬</span>
+                                <span>Conversation</span>
+                            </div>
+                            <div class="agent-description">Handle user chat interaction</div>
+                        </div>
+
+                        <div class="agent-node" id="agent-router">
+                            <div class="agent-title">
+                                <span>🚦</span>
+                                <span>Router</span>
+                            </div>
+                            <div class="agent-description">Decide if sufficient info collected</div>
+                        </div>
+
+                        <div class="agent-node" id="agent-extraction">
+                            <div class="agent-title">
+                                <span>🔍</span>
+                                <span>Extraction</span>
+                            </div>
+                            <div class="agent-description">Extract structured fields from chat</div>
+                        </div>
+
+                        <div class="agent-node" id="agent-response">
+                            <div class="agent-title">
+                                <span>✨</span>
+                                <span>Response</span>
+                            </div>
+                            <div class="agent-description">Generate final assistant response</div>
+                        </div>
+                    </div>
+
+                    <!-- Agent Details -->
+                    <div class="agent-details" id="agentDetails">
+                    <div style="order: 1;">
+                        <div class="detail-header">Agent Sub-Nodes</div>
+                        <div id="subNodesContainer"></div>
+                        <div class="node-data-display" id="nodeDataDisplay">
+                            <div class="node-data-title" id="nodeDataTitle"></div>
+                            <div class="node-data-content" id="nodeDataContent"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="final-report" id="reportSection">
+                <div class="report-header">💬 Chat Session Complete</div>
+                <div class="chat-output">
+                    <div class="chat-message user-message">
+                        <strong>User:</strong> I want to build a healthcare AI system for diagnosing diseases from medical images.
+                    </div>
+                    <div class="chat-message assistant-message">
+                        <strong>Assistant:</strong> That's an excellent project! I've collected all the necessary information. Your healthcare AI project focuses on medical image diagnosis with goals including high accuracy and real-time processing. I'll help you generate a comprehensive roadmap and feasibility analysis.
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding: 20px; background: rgba(0,0,0,0.3); border-radius: 10px;">
+                    <h3 style="color: #10b981; margin-bottom: 15px;">📋 Extracted Fields</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;">
+                        <div><strong>Domain:</strong> Healthcare AI, Medical Imaging</div>
+                        <div><strong>Goals:</strong> High accuracy, Real-time processing</div>
+                        <div><strong>Team Size:</strong> 5 members</div>
+                        <div><strong>Timeline:</strong> 6 months</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage">
+                🎉 Chat session completed successfully!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const agentSubNodes = {
+            conversation: [
+                { id: 'receive', icon: '📥', title: 'Receive Message', status: 'Get user input' },
+                { id: 'context', icon: '🧠', title: 'Load Context', status: 'Get chat history' },
+                { id: 'llm-chat', icon: '💭', title: 'LLM Processing', status: 'Generate response' }
+            ],
+            router: [
+                { id: 'check-turns', icon: '🔢', title: 'Check Turn Count', status: 'Verify interaction length' },
+                { id: 'assess', icon: '🎯', title: 'Assess Completeness', status: 'Check if info sufficient' },
+                { id: 'decide', icon: '⚡', title: 'Make Decision', status: 'CONTINUE or EXTRACT' }
+            ],
+            extraction: [
+                { id: 'aggregate', icon: '📋', title: 'Aggregate Messages', status: 'Combine all chat turns' },
+                { id: 'llm-extract', icon: '🔍', title: 'LLM Extraction', status: 'Extract structured fields' },
+                { id: 'validate', icon: '✓', title: 'Validate Fields', status: 'Check data quality' }
+            ],
+            response: [
+                { id: 'format', icon: '✨', title: 'Format Response', status: 'Structure final output' },
+                { id: 'save', icon: '💾', title: 'Save Session', status: 'Store chat to DB' },
+                { id: 'complete', icon: '✅', title: 'Mark Complete', status: 'End session' }
+            ]
+        };
+
+        const nodeDataExplanations = {
+            'receive': {
+                title: '📥 Receive User Message',
+                data: [
+                    { label: 'Process', value: 'Receives user message as plain text via SSE endpoint (e.g., \"I want to build a healthcare AI system...\") and adds to ChatState' }
+                ]
+            },
+            'context': {
+                title: '🧠 Load Chat Context',
+                data: [
+                    { label: 'Process', value: 'Queries PostgreSQL chat_messages table to retrieve 3 previous messages plus current (4 total) for full conversation history' }
+                ]
+            },
+            'llm-chat': {
+                title: '💭 LLM Chat Processing',
+                data: [
+                    { label: 'Process', value: 'Generates conversational response using last 10 messages for continuity, asking clarifying questions to gather project details' }
+                ]
+            },
+            'check-turns': {
+                title: '🔢 Check Turn Count',
+                data: [
+                    { label: 'Process', value: 'Counts conversation turns (4 messages = 2 user + 2 assistant) and verifies minimum 3-turn threshold is met before proceeding to assessment' }
+                ]
+            },
+            'assess': {
+                title: '🎯 Assess Information Completeness',
+                data: [
+                    { label: 'Analysis', value: 'Evaluates chat history for required fields (domain, problem_statement, goals, timeline, team_size) with 92% completeness indicating sufficient info' }
+                ]
+            },
+            'decide': {
+                title: '⚡ Router Decision',
+                data: [
+                    { label: 'Decision', value: 'Applies logic: if completeness >80% → EXTRACT fields, else → CONTINUE conversation. Current 92% triggers Field Extraction Agent' }
+                ]
+            },
+            'aggregate': {
+                title: '📋 Aggregate Chat Messages',
+                data: [
+                    { label: 'Process', value: 'Concatenates 4 messages with turn markers (\"User: ..., Assistant: ...\") into ~500 words of conversational context for extraction' }
+                ]
+            },
+            'llm-extract': {
+                title: '🔍 LLM Field Extraction',
+                data: [
+                    { label: 'Process', value: 'Analyzes aggregated conversation to extract 15+ structured fields (domain, goals, timeline, team_size, budget, tech_stack) with Pydantic schema validation' }
+                ]
+            },
+            'validate': {
+                title: '✓ Field Validation',
+                data: [
+                    { label: 'Process', value: 'Validates all 15 required fields are present with non-empty strings and valid value ranges using Pydantic schema and business rules' }
+                ]
+            },
+            'format': {
+                title: '✨ Format Response',
+                data: [
+                    { label: 'Process', value: 'Creates confirmation message with summary (\"Great! I\'ve collected all necessary information...\") as final assistant message in ChatState' }
+                ]
+            },
+            'save': {
+                title: '💾 Save Chat Session',
+                data: [
+                    { label: 'Process', value: 'Inserts final assistant message into PostgreSQL chat_messages table with session_id, role, content, timestamp, and extracted_fields' }
+                ]
+            },
+            'complete': {
+                title: '✅ Mark Session Complete',
+                data: [
+                    { label: 'Process', value: 'Sets is_complete=True in ChatState and returns session_id, enabling frontend to trigger roadmap/feasibility pipelines' }
+                ]
+            }
+        };
+
+        const steps = [
+            { progress: 5, message: 'Initializing chat pipeline...', duration: 1000 },
+            
+            // Conversation Agent (Turn 1)
+            { progress: 10, agent: 'conversation', subNode: 'receive', message: 'Receiving user message...', duration: 1000 },
+            { progress: 14, agent: 'conversation', subNode: 'context', message: 'Loading chat history...', duration: 1200 },
+            { progress: 18, agent: 'conversation', subNode: 'llm-chat', agentComplete: true, message: 'LLM generating response...', duration: 2000 },
+            
+            // Router Agent (First check - needs more info)
+            { progress: 24, agent: 'router', subNode: 'check-turns', message: 'Checking turn count (2 turns)...', duration: 1000 },
+            { progress: 28, agent: 'router', subNode: 'assess', message: 'Assessing completeness (40%)...', duration: 1500 },
+            { progress: 32, agent: 'router', subNode: 'decide', agentComplete: true, message: 'Decision: CONTINUE (need more info)', duration: 1200 },
+            
+            // Conversation Agent (Turn 2 - after more user input)
+            { progress: 38, agent: 'conversation', subNode: 'receive', message: 'Receiving follow-up...', duration: 1000 },
+            { progress: 42, agent: 'conversation', subNode: 'context', message: 'Updating context...', duration: 1000 },
+            { progress: 46, agent: 'conversation', subNode: 'llm-chat', agentComplete: true, message: 'Generating clarification...', duration: 2000 },
+            
+            // Router Agent (Second check - ready to extract)
+            { progress: 52, agent: 'router', subNode: 'check-turns', message: 'Checking turn count (4 turns)...', duration: 1000 },
+            { progress: 58, agent: 'router', subNode: 'assess', message: 'Assessing completeness (92%)...', duration: 1500 },
+            { progress: 64, agent: 'router', subNode: 'decide', agentComplete: true, message: 'Decision: EXTRACT (sufficient info)', duration: 1200 },
+            
+            // Extraction Agent
+            { progress: 70, agent: 'extraction', subNode: 'aggregate', message: 'Aggregating 4 messages...', duration: 1500 },
+            { progress: 78, agent: 'extraction', subNode: 'llm-extract', message: 'Extracting structured fields...', duration: 2500 },
+            { progress: 86, agent: 'extraction', subNode: 'validate', agentComplete: true, message: 'Fields validated', duration: 1500 },
+            
+            // Response Agent
+            { progress: 90, agent: 'response', subNode: 'format', message: 'Formatting final response...', duration: 1200 },
+            { progress: 95, agent: 'response', subNode: 'save', message: 'Saving chat to database...', duration: 1500 },
+            { progress: 100, agent: 'response', subNode: 'complete', agentComplete: true, showReport: true, message: 'Session complete!', duration: 1000 }
+        ];
+
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function updateMessage(message) {
+            const msgElem = document.getElementById('processingMsg');
+            msgElem.textContent = message;
+        }
+
+        function showAgentDetails(agentKey) {
+            const container = document.getElementById('subNodesContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            const nodes = agentSubNodes[agentKey];
+            
+            if (!nodes) return;
+            
+            container.innerHTML = `
+                <div class="sub-nodes-grid">
+                    ${nodes.map(node => `
+                        <div class="sub-node" id="subnode-${node.id}">
+                            <div class="sub-node-icon">${node.icon}</div>
+                            <div class="sub-node-title">${node.title}</div>
+                            <div class="sub-node-status">${node.status}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            
+            agentDetails.classList.add('visible');
+        }
+
+        function zoomToAgent(agentKey) {
+            const zoomContainer = document.getElementById('zoomContainer');
+            zoomContainer.classList.add('zoomed-in');
+            zoomContainer.classList.remove('overview');
+        }
+
+        function zoomOut() {
+            const zoomContainer = document.getElementById('zoomContainer');
+            zoomContainer.classList.remove('zoomed-in');
+            zoomContainer.classList.add('overview');
+        }
+
+        function activateAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                document.querySelectorAll('.agent-node').forEach(n => {
+                    n.classList.remove('active');
+                    n.style.animation = 'none';
+                });
+                agentNode.classList.add('active');
+                agentNode.style.animation = 'pulse-glow 2s ease-in-out infinite';
+                zoomToAgent(agentKey);
+                showAgentDetails(agentKey);
+            }
+        }
+
+        function completeAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                agentNode.classList.remove('active');
+                agentNode.classList.add('completed');
+                agentNode.style.animation = 'none';
+                zoomOut();
+            }
+        }
+
+        function activateSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                document.querySelectorAll('.sub-node').forEach(n => n.classList.remove('active'));
+                subNode.classList.add('active');
+                showNodeData(subNodeId);
+            }
+        }
+
+        function completeSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                subNode.classList.remove('active');
+                subNode.classList.add('completed');
+            }
+        }
+
+        function showNodeData(subNodeId) {
+            const dataDisplay = document.getElementById('nodeDataDisplay');
+            const dataTitle = document.getElementById('nodeDataTitle');
+            const dataContent = document.getElementById('nodeDataContent');
+            
+            const nodeData = nodeDataExplanations[subNodeId];
+            
+            if (!nodeData) {
+                dataDisplay.classList.remove('visible');
+                return;
+            }
+            
+            dataTitle.textContent = nodeData.title;
+            
+            dataContent.innerHTML = nodeData.data.map(item => `
+                <div class="data-item">
+                    <div class="data-label">${item.label}</div>
+                    <div class="data-value">${item.value}</div>
+                </div>
+            `).join('');
+            
+            dataDisplay.classList.add('visible');
+        }
+
+        function showFinalReport() {
+            document.getElementById('reportSection').classList.add('visible');
+            document.getElementById('statusMessage').classList.add('visible');
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            updateProgress(step.progress);
+            
+            if (step.message) {
+                updateMessage(step.message);
+            }
+            
+            if (step.agent) {
+                activateAgent(step.agent);
+                await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+            
+            if (step.subNode) {
+                activateSubNode(step.subNode);
+                await new Promise(resolve => setTimeout(resolve, step.duration * 0.8));
+                completeSubNode(step.subNode);
+            }
+            
+            if (step.agentComplete && step.agent) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                completeAgent(step.agent);
+            }
+            
+            if (step.showReport) {
+                showFinalReport();
+            }
+
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            updateProgress(0);
+            document.getElementById('processingMsg').textContent = '';
+            
+            document.querySelectorAll('.agent-node').forEach(node => {
+                node.classList.remove('active', 'completed');
+            });
+            
+            document.getElementById('subNodesContainer').innerHTML = '';
+            document.getElementById('nodeDataDisplay').classList.remove('visible');
+            
+            document.getElementById('reportSection').classList.remove('visible');
+            document.getElementById('statusMessage').classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>

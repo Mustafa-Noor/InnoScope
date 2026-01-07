@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InnoScope Pipeline Animations</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 50%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #64748b;
+        }
+
+        .pipeline-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .pipeline-card {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border: 1px solid #e2e8f0;
+            animation: fadeInUp 0.8s ease-out;
+            animation-fill-mode: both;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .pipeline-card:nth-child(1) { animation-delay: 0.1s; }
+        .pipeline-card:nth-child(2) { animation-delay: 0.2s; }
+        .pipeline-card:nth-child(3) { animation-delay: 0.3s; }
+        .pipeline-card:nth-child(4) { animation-delay: 0.4s; }
+
+        .pipeline-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.1), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .pipeline-card:hover::before {
+            left: 100%;
+        }
+
+        .pipeline-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+            border-color: #10b981;
+        }
+
+        .pipeline-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .pipeline-card:nth-child(1) .pipeline-icon { animation-delay: 0s; }
+        .pipeline-card:nth-child(2) .pipeline-icon { animation-delay: 0.5s; }
+        .pipeline-card:nth-child(3) .pipeline-icon { animation-delay: 1s; }
+        .pipeline-card:nth-child(4) .pipeline-icon { animation-delay: 1.5s; }
+
+        h2 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        .pipeline-description {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .pipeline-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            display: block;
+            color: #10b981;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            margin-top: 15px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .features {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            margin-top: 40px;
+            animation: fadeInUp 1s ease-out;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .features h3 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            text-align: center;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 15px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .feature-icon {
+            font-size: 28px;
+        }
+
+        .feature-item span {
+            color: #334155;
+            font-size: 14px;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            opacity: 0.8;
+            animation: fadeInUp 1.2s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 InnoScope Pipeline Animations</h1>
+            <p class="subtitle">Interactive visualizations of AI-powered research pipelines</p>
+        </header>
+
+        <div class="pipeline-grid">
+            <div class="pipeline-card" onclick="location.href='roadmap_animation.html'">
+                <span class="pipeline-icon">🗺️</span>
+                <h2>Roadmap Pipeline</h2>
+                <p class="pipeline-description">
+                    3-stage pipeline that transforms research papers into structured 8-phase implementation roadmaps.
+                </p>
+                <div class="pipeline-stats">
+                    <div class="stat">
+                        <span class="stat-value">3</span>
+                        <span class="stat-label">Stages</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">8</span>
+                        <span class="stat-label">Phases</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">5</span>
+                        <span class="stat-label">Nodes</span>
+                    </div>
+                </div>
+                <a href="roadmap_animation.html" class="btn">View Animation</a>
+            </div>
+
+            <div class="pipeline-card" onclick="location.href='feasibility_animation.html'">
+                <span class="pipeline-icon">📊</span>
+                <h2>Feasibility Pipeline</h2>
+                <p class="pipeline-description">
+                    Multi-dimensional assessment across 5 criteria to evaluate project viability with scoring.
+                </p>
+                <div class="pipeline-stats">
+                    <div class="stat">
+                        <span class="stat-value">5</span>
+                        <span class="stat-label">Dimensions</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">7</span>
+                        <span class="stat-label">Nodes</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">100</span>
+                        <span class="stat-label">Max Score</span>
+                    </div>
+                </div>
+                <a href="feasibility_animation.html" class="btn">View Animation</a>
+            </div>
+
+            <div class="pipeline-card" onclick="location.href='chat_animation.html'">
+                <span class="pipeline-icon">💬</span>
+                <h2>Chat Agent Pipeline</h2>
+                <p class="pipeline-description">
+                    Conversational AI that intelligently gathers project requirements through natural dialogue.
+                </p>
+                <div class="pipeline-stats">
+                    <div class="stat">
+                        <span class="stat-value">6</span>
+                        <span class="stat-label">Nodes</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">2</span>
+                        <span class="stat-label">Routes</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">∞</span>
+                        <span class="stat-label">Turns</span>
+                    </div>
+                </div>
+                <a href="chat_animation.html" class="btn">View Animation</a>
+            </div>
+
+            <div class="pipeline-card" onclick="location.href='summarization_animation.html'">
+                <span class="pipeline-icon">📝</span>
+                <h2>Summarization Pipeline</h2>
+                <p class="pipeline-description">
+                    Extracts and condenses research papers into concise, actionable summaries with field extraction.
+                </p>
+                <div class="pipeline-stats">
+                    <div class="stat">
+                        <span class="stat-value">3</span>
+                        <span class="stat-label">Steps</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">2</span>
+                        <span class="stat-label">Formats</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-value">Fast</span>
+                        <span class="stat-label">Speed</span>
+                    </div>
+                </div>
+                <a href="summarization_animation.html" class="btn">View Animation</a>
+            </div>
+        </div>
+
+        <div class="features">
+            <h3>✨ Animation Features</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">🎬</span>
+                    <div>
+                        <strong>Real-time Flow</strong><br>
+                        Watch data flow through nodes
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📊</span>
+                    <div>
+                        <strong>Progress Tracking</strong><br>
+                        See completion percentages
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎨</span>
+                    <div>
+                        <strong>Interactive Controls</strong><br>
+                        Play, pause, and reset
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔍</span>
+                    <div>
+                        <strong>State Inspection</strong><br>
+                        View data at each step
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <div>
+                        <strong>Node Highlighting</strong><br>
+                        Active node indicators
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📱</span>
+                    <div>
+                        <strong>Responsive Design</strong><br>
+                        Works on all devices
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>InnoScope Pipeline Visualizations | Built with ❤️ for Software Project Management</p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">January 2026</p>
+        </footer>
+    </div>
+</body>
+</html>
