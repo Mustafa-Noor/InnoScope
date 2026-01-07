@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Roadmap Pipeline Animation</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #ecfdf5 50%, #f8fafc 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+            letter-spacing: -0.01em;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 15px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 12px 24px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            color: #334155;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 15px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .back-btn:hover {
+            background: #f8fafc;
+            transform: translateX(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        .pipeline-container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .graph-layout {
+            position: relative;
+            min-height: 900px;
+            margin-bottom: 30px;
+            overflow: visible;
+            perspective: 1000px;
+        }
+
+        .zoom-container {
+            width: 100%;
+            height: 100%;
+            transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center top;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .zoom-container.overview {
+            transform: scale(1) translateX(0);
+        }
+
+        .agent-graph {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 50%, #ecfdf5 100%);
+            border-radius: 12px;
+            padding: 30px 40px;
+            display: flex;
+            flex-direction: row;
+            gap: 80px;
+            border: 1px solid #a7f3d0;
+            flex-shrink: 0;
+            position: relative;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            overflow: visible;
+        }
+
+        .agent-graph::before {
+            content: '';
+            position: absolute;
+            left: 90px;
+            right: 90px;
+            top: 50%;
+            height: 3px;
+            background: linear-gradient(90deg, #10b981, #059669);
+            transform: translateY(-50%);
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .agent-node {
+            background: white;
+            border-radius: 50%;
+            width: 120px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            z-index: 1;
+            padding: 10px;
+        }
+
+        .agent-node.active {
+            border-color: #10b981;
+            border-width: 3px;
+            box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            transform: scale(2.5);
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            animation: zoom-pulse 1.5s ease-in-out;
+            z-index: 100;
+            position: relative;
+        }
+
+        .agent-node.active .agent-title,
+        .agent-node.active .agent-title span {
+            color: white;
+        }
+
+        @keyframes zoom-pulse {
+            0% { transform: scale(1.15); z-index: 100; }
+            50% { transform: scale(2.6); z-index: 100; }
+            100% { transform: scale(2.5); z-index: 100; }
+        }
+
+        .agent-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 8px 32px rgba(16, 185, 129, 0.4);
+            }
+            50% {
+                box-shadow: 0 12px 40px rgba(16, 185, 129, 0.7);
+            }
+        }
+
+
+        .agent-node:last-child::after {
+            display: none;
+        }
+
+        .agent-title {
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            color: #0f172a;
+            letter-spacing: -0.01em;
+            text-align: center;
+            line-height: 1.3;
+        }
+
+        .agent-title span:first-child {
+            font-size: 28px;
+        }
+
+        .agent-description {
+            display: none;
+        }
+
+        .agent-details {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            border: 1px solid #047857;
+            box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3);
+            flex: 1;
+            margin-top: 20px;
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: all 0.6s ease;
+        }
+
+        .agent-details.visible {
+            opacity: 1;
+            transform: scale(1);
+            max-height: 2000px;
+        }
+
+        .detail-header {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 12px;
+            letter-spacing: -0.01em;
+        }
+
+        .sub-nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .sub-nodes-grid::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+            opacity: 0.3;
+            z-index: 0;
+        }
+
+        .sub-node {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+            border-radius: 8px;
+            padding: 14px 12px;
+            border: 2px solid #d1fae5;
+            transition: all 0.3s ease;
+            color: #1f2937;
+            will-change: opacity, transform;
+            box-shadow: 0 2px 6px rgba(16, 185, 129, 0.1);
+            position: relative;
+            overflow: hidden;
+            z-index: 2;
+        }
+
+        .sub-node::before {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            width: 2px;
+            height: 15px;
+            background: #10b981;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1;
+        }
+
+        .sub-node.active {
+            border-color: #ffffff;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.9), 0 4px 20px rgba(255, 255, 255, 0.6);
+            background: white;
+            border-width: 3px;
+            transform: scale(1.12);
+            z-index: 10;
+        }
+
+        .sub-node.active::before {
+            opacity: 1;
+            animation: pulse-dot 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+
+        .sub-node.active .sub-node-title,
+        .sub-node.active .sub-node-status,
+        .sub-node.active .sub-node-icon {
+            color: #059669;
+            font-weight: 700;
+        }
+
+        .sub-node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .sub-node-icon {
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .sub-node-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #0f172a;
+            line-height: 1.3;
+        }
+
+        .sub-node-status {
+            font-size: 11px;
+            color: #64748b;
+            line-height: 1.3;
+        }
+
+        .node-data-display {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+            order: 2;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+        }
+
+        .node-data-display.visible {
+            display: block;
+            animation: fadeInScale 0.4s ease-out;
+        }
+
+        .node-data-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #10b981;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .node-data-content {
+            font-size: 1.05rem;
+            line-height: 1.7;
+        }
+
+        .data-item {
+            background: rgba(16, 185, 129, 0.05);
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 3px solid #10b981;
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #10b981;
+            margin-bottom: 6px;
+            font-size: 1.1rem;
+        }
+
+        .data-value {
+            color: #1f2937;
+            font-size: 1.05rem;
+            line-height: 1.6;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .processing-indicator {
+            text-align: center;
+            padding: 15px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+
+        .final-report {
+            background: rgba(16, 185, 129, 0.2);
+            border: 2px solid #10b981;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .final-report.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .report-header {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #10b981;
+        }
+
+        .roadmap-phases {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .phase-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #10b981;
+        }
+
+        .phase-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #10b981;
+        }
+
+        .phase-detail {
+            font-size: 0.95rem;
+            opacity: 0.9;
+        }
+
+        .status-message {
+            text-align: center;
+            font-size: 1.2rem;
+            padding: 20px;
+            background: rgba(74, 222, 128, 0.2);
+            border-radius: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status-message.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.7;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Roadmap Pipeline Animation</h1>
+            <p>Multi-agent 8-phase implementation planning</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="pipeline-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar">0%</div>
+            </div>
+
+            <div class="processing-indicator" id="processingMsg"></div>
+
+            <div class="graph-layout">
+                <div class="zoom-container" id="zoomContainer" class="overview">
+                    <!-- Agent Graph -->
+                    <div class="agent-graph">
+                        <div class="agent-node" id="agent-scoping">
+                            <div class="agent-title">
+                                <span>📄</span>
+                                <span>Scoping Agent</span>
+                            </div>
+                            <div class="agent-description">Extract and structure project information</div>
+                        </div>
+
+                    <div class="agent-node" id="agent-research">
+                        <div class="agent-title">
+                            <span>🔍</span>
+                            <span>Research Agent</span>
+                        </div>
+                        <div class="agent-description">Enrich context with external sources</div>
+                    </div>
+
+                    <div class="agent-node" id="agent-generation">
+                        <div class="agent-title">
+                            <span>✨</span>
+                            <span>Generation Agent</span>
+                        </div>
+                        <div class="agent-description">Create 8-phase roadmap structure</div>
+                    </div>
+                </div>
+
+                <!-- Agent Details -->
+                <div class="agent-details" id="agentDetails">
+                    <div style="order: 1;">
+                        <div class="detail-header">Agent Sub-Nodes</div>
+                        <div id="subNodesContainer"></div>
+                        <div class="node-data-display" id="nodeDataDisplay">
+                            <div class="node-data-title" id="nodeDataTitle"></div>
+                            <div class="node-data-content" id="nodeDataContent"></div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <div class="final-report" id="reportSection">
+                <div class="report-header">📋 8-Phase Roadmap</div>
+                <div class="roadmap-phases">
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 1: Prototype Development</div>
+                        <div class="phase-detail">Build MVP with core features and validate concept</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 2: Testing & Validation</div>
+                        <div class="phase-detail">Verify functionality, performance, and user acceptance</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 3: Funding & Grants</div>
+                        <div class="phase-detail">Secure financial resources and investment</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 4: Manufacturing/Implementation</div>
+                        <div class="phase-detail">Scale production or deployment infrastructure</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 5: Marketing & Promotion</div>
+                        <div class="phase-detail">Build brand awareness and generate demand</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 6: Launch/Deployment</div>
+                        <div class="phase-detail">Execute go-to-market strategy</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 7: Maintenance & Iteration</div>
+                        <div class="phase-detail">Continuous improvement and bug fixes</div>
+                    </div>
+                    <div class="phase-item">
+                        <div class="phase-title">Phase 8: Scaling & Expansion</div>
+                        <div class="phase-detail">Grow user base and expand to new markets</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage">
+                🎉 Roadmap generation completed successfully!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const agentSubNodes = {
+            scoping: [
+                { id: 'extract', icon: '📥', title: 'Extract Content', status: 'Parse document text' },
+                { id: 'summarize', icon: '📝', title: 'LLM Summarization', status: 'Generate summary' },
+                { id: 'extract-fields', icon: '🔍', title: 'Extract Fields', status: 'Get domain, goals, etc.' }
+            ],
+            research: [
+                { id: 'route', icon: '🚦', title: 'Route Decision', status: 'Check if enrichment needed' },
+                { id: 'wiki', icon: '📚', title: 'Wikipedia Search', status: 'Fetch domain context' },
+                { id: 'ddg', icon: '🔎', title: 'DuckDuckGo Search', status: 'Get recent trends' },
+                { id: 'consolidate', icon: '📋', title: 'Consolidate', status: 'Merge all research' }
+            ],
+            generation: [
+                { id: 'llm-generate', icon: '✨', title: 'LLM Generation', status: 'Create roadmap phases' },
+                { id: 'structure', icon: '📊', title: 'Structure Phases', status: 'Format 8 phases' },
+                { id: 'validate', icon: '✓', title: 'Validate Output', status: 'Check completeness' }
+            ]
+        };
+
+        const nodeDataExplanations = {
+            'extract': {
+                title: '📥 Content Extraction',
+                data: [
+                    { label: 'Process', value: 'Extracts ~12,000 characters of raw text from PDF documents using PyPDF2 or directly from chat summaries for downstream processing' }
+                ]
+            },
+            'summarize': {
+                title: '📝 LLM Summarization',
+                data: [
+                    { label: 'Process', value: 'Uses map-reduce strategy for documents >8K tokens to generate ~500 word concise project overview ready for field extraction' }
+                ]
+            },
+            'extract-fields': {
+                title: '🔍 Field Extraction',
+                data: [
+                    { label: 'Process', value: 'Analyzes summary to extract structured fields (domain, problem_statement, goals, prerequisites, topics) with Pydantic schema validation' }
+                ]
+            },
+            'route': {
+                title: '🚦 Routing Decision',
+                data: [
+                    { label: 'Decision', value: 'Evaluates summary completeness - if <200 words triggers Wiki + DuckDuckGo enrichment, if >200 words proceeds directly to generation' }
+                ]
+            },
+            'wiki': {
+                title: '📚 Wikipedia Enrichment',
+                data: [
+                    { label: 'Process', value: 'Searches Wikipedia using domain + topics query to retrieve ~2,000 words of background context including technical definitions and industry standards' }
+                ]
+            },
+            'ddg': {
+                title: '🔎 DuckDuckGo Search',
+                data: [
+                    { label: 'Process', value: 'Queries DuckDuckGo Instant Answer API for latest trends using "domain + 2026" to retrieve 5 snippets about emerging technologies and market insights' }
+                ]
+            },
+            'consolidate': {
+                title: '📋 Research Consolidation',
+                data: [
+                    { label: 'Process', value: 'Merges original summary + Wikipedia context + DuckDuckGo trends into ~4,500 words of deduplicated enriched content for roadmap generation' }
+                ]
+            },
+            'llm-generate': {
+                title: '✨ LLM Roadmap Generation',
+                data: [
+                    { label: 'Process', value: 'Generates detailed 8-phase roadmap using enriched project context and standard template with phases, descriptions, timelines, and deliverables' }
+                ]
+            },
+            'structure': {
+                title: '📊 Phase Structuring',
+                data: [
+                    { label: 'Process', value: 'Parses LLM output into 8 structured phase objects (Prototype, Testing, Funding, Manufacturing, Marketing, Launch, Maintenance, Scaling) with validated schema' }
+                ]
+            },
+            'validate': {
+                title: '✓ Output Validation',
+                data: [
+                    { label: 'Process', value: 'Validates RoadmapState schema ensuring all 8 phases are present with meaningful descriptions (>50 chars) and proper formatting for delivery' }
+                ]
+            }
+        };
+
+        const steps = [
+            { progress: 5, message: 'Initializing roadmap pipeline...', duration: 1000 },
+            
+            // Scoping Agent
+            { progress: 10, agent: 'scoping', subNode: 'extract', message: 'Extracting document content...', duration: 1500 },
+            { progress: 18, agent: 'scoping', subNode: 'summarize', message: 'LLM summarizing content...', duration: 2500 },
+            { progress: 26, agent: 'scoping', subNode: 'extract-fields', agentComplete: true, message: 'Fields extracted successfully', duration: 2000 },
+            
+            // Research Agent
+            { progress: 34, agent: 'research', subNode: 'route', message: 'Routing decision: ENRICH', duration: 1500 },
+            { progress: 42, agent: 'research', subNode: 'wiki', message: 'Fetching Wikipedia context...', duration: 2500 },
+            { progress: 52, agent: 'research', subNode: 'ddg', message: 'Searching latest trends...', duration: 2500 },
+            { progress: 62, agent: 'research', subNode: 'consolidate', agentComplete: true, message: 'Research consolidated', duration: 2000 },
+            
+            // Generation Agent
+            { progress: 72, agent: 'generation', subNode: 'llm-generate', message: 'LLM generating roadmap...', duration: 3000 },
+            { progress: 85, agent: 'generation', subNode: 'structure', message: 'Structuring 8 phases...', duration: 2000 },
+            { progress: 95, agent: 'generation', subNode: 'validate', agentComplete: true, message: 'Validation complete', duration: 1500 },
+            { progress: 100, showReport: true, message: 'Roadmap generated!', duration: 1500 }
+        ];
+
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function updateMessage(message) {
+            const msgElem = document.getElementById('processingMsg');
+            msgElem.textContent = message;
+        }
+
+        function showAgentDetails(agentKey) {
+            const container = document.getElementById('subNodesContainer');
+            const nodes = agentSubNodes[agentKey];
+            
+            if (!nodes) return;
+            
+            container.innerHTML = `
+                <div class="sub-nodes-grid">
+                    ${nodes.map(node => `
+                        <div class="sub-node" id="subnode-${node.id}">
+                            <div class="sub-node-icon">${node.icon}</div>
+                            <div class="sub-node-title">${node.title}</div>
+                            <div class="sub-node-status">${node.status}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function zoomToAgent(agentKey) {
+            const zoomContainer = document.getElementById('zoomContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            
+            zoomContainer.classList.remove('overview');
+            zoomContainer.classList.add('zoomed-in');
+            
+            setTimeout(() => {
+                agentDetails.classList.add('visible');
+            }, 1500);
+        }
+
+        function zoomOut() {
+            const zoomContainer = document.getElementById('zoomContainer');
+            const agentDetails = document.getElementById('agentDetails');
+            
+            agentDetails.classList.remove('visible');
+            
+            setTimeout(() => {
+                zoomContainer.classList.remove('zoomed-in');
+                zoomContainer.classList.add('overview');
+            }, 600);
+        }
+
+        function activateAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                document.querySelectorAll('.agent-node').forEach(n => {
+                    n.classList.remove('active');
+                    n.style.animation = '';
+                });
+                agentNode.classList.add('active');
+                agentNode.style.animation = 'pulse-glow 2s ease-in-out infinite';
+                showAgentDetails(agentKey);
+                zoomToAgent(agentKey);
+            }
+        }
+
+        function completeAgent(agentKey) {
+            const agentNode = document.getElementById('agent-' + agentKey);
+            if (agentNode) {
+                agentNode.classList.remove('active');
+                agentNode.style.animation = '';
+                agentNode.classList.add('completed');
+                zoomOut();
+            }
+        }
+
+        function activateSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                document.querySelectorAll('.sub-node').forEach(n => n.classList.remove('active'));
+                subNode.classList.add('active');
+                showNodeData(subNodeId);
+            }
+        }
+
+        function completeSubNode(subNodeId) {
+            const subNode = document.getElementById('subnode-' + subNodeId);
+            if (subNode) {
+                subNode.classList.remove('active');
+                subNode.classList.add('completed');
+            }
+        }
+
+        function showNodeData(subNodeId) {
+            const dataDisplay = document.getElementById('nodeDataDisplay');
+            const dataTitle = document.getElementById('nodeDataTitle');
+            const dataContent = document.getElementById('nodeDataContent');
+            
+            const nodeData = nodeDataExplanations[subNodeId];
+            
+            if (!nodeData) {
+                dataDisplay.classList.remove('visible');
+                return;
+            }
+            
+            dataTitle.textContent = nodeData.title;
+            
+            dataContent.innerHTML = nodeData.data.map(item => `
+                <div class="data-item">
+                    <div class="data-label">${item.label}</div>
+                    <div class="data-value">${item.value}</div>
+                </div>
+            `).join('');
+            
+            dataDisplay.classList.add('visible');
+        }
+
+        function showFinalReport() {
+            document.getElementById('reportSection').classList.add('visible');
+            document.getElementById('statusMessage').classList.add('visible');
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            updateProgress(step.progress);
+            
+            if (step.message) {
+                updateMessage(step.message);
+            }
+            
+            if (step.agent) {
+                activateAgent(step.agent);
+            }
+            
+            if (step.subNode) {
+                activateSubNode(step.subNode);
+                await new Promise(resolve => setTimeout(resolve, step.duration / 2));
+                completeSubNode(step.subNode);
+            }
+            
+            if (step.agentComplete && step.agent) {
+                completeAgent(step.agent);
+            }
+            
+            if (step.showReport) {
+                showFinalReport();
+            }
+
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            updateProgress(0);
+            document.getElementById('processingMsg').textContent = '';
+            
+            document.querySelectorAll('.agent-node').forEach(node => {
+                node.classList.remove('active', 'completed');
+            });
+            
+            document.getElementById('subNodesContainer').innerHTML = '';
+            document.getElementById('nodeDataDisplay').classList.remove('visible');
+            
+            document.getElementById('reportSection').classList.remove('visible');
+            document.getElementById('statusMessage').classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>

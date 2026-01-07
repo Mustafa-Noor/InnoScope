@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Agent Pipeline Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .back-btn:hover {
+            background: white;
+            color: #4facfe;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: white;
+            color: #4facfe;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chat-simulation {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+        }
+
+        .chat-header {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            padding: 15px 20px;
+            border-radius: 15px;
+            max-width: 80%;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            background: rgba(255, 255, 255, 0.2);
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .message.ai {
+            background: rgba(79, 172, 254, 0.3);
+            align-self: flex-start;
+        }
+
+        .message-header {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: rgba(79, 172, 254, 0.3);
+            border-radius: 15px;
+            max-width: 80px;
+        }
+
+        .typing-indicator.visible {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 5px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        .pipeline-flow {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+        }
+
+        .flow-header {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .node-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .node {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            border: 3px solid transparent;
+            transition: all 0.5s ease;
+            position: relative;
+        }
+
+        .node.active {
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            transform: scale(1.03);
+        }
+
+        .node.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .node-icon {
+            font-size: 2rem;
+        }
+
+        .node-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+
+        .node-description {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .node-arrow {
+            text-align: center;
+            font-size: 2rem;
+            opacity: 0.3;
+            transition: opacity 0.5s ease;
+        }
+
+        .node-arrow.active {
+            opacity: 1;
+            animation: bounce 1s ease-in-out infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .router-node {
+            background: rgba(255, 165, 0, 0.2);
+        }
+
+        .router-branches {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .branch {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border: 2px solid transparent;
+            transition: all 0.5s ease;
+        }
+
+        .branch.active {
+            border-color: #10b981;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+        }
+
+        .branch-label {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .extracted-data {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 30px;
+        }
+
+        .data-header {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .data-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        .data-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .data-label {
+            font-weight: bold;
+            color: #00f2fe;
+            margin-bottom: 5px;
+        }
+
+        .data-value {
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .completion-banner {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .completion-banner.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .completion-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .completion-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 968px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>💬 Chat Agent Pipeline Animation</h1>
+            <p>Intelligent conversational requirement gathering</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="main-layout">
+            <div class="chat-simulation">
+                <div class="chat-header">
+                    💬 Live Conversation
+                </div>
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message ai">
+                        <div class="message-header">AI Assistant</div>
+                        <div>Hello! I'm here to help you define your research project. What problem are you trying to solve?</div>
+                    </div>
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pipeline-flow">
+                <div class="flow-header">⚙️ Pipeline Processing</div>
+                <div class="node-container">
+                    <div class="node" id="node-extract">
+                        <div class="node-header">
+                            <span class="node-icon">🔍</span>
+                            <span class="node-title">Extract Fields</span>
+                        </div>
+                        <p class="node-description">Parse conversation to extract structured project fields</p>
+                    </div>
+
+                    <div class="node-arrow" id="arrow1">↓</div>
+
+                    <div class="node" id="node-missing">
+                        <div class="node-header">
+                            <span class="node-icon">📋</span>
+                            <span class="node-title">Find Missing</span>
+                        </div>
+                        <p class="node-description">Identify incomplete or unclear fields</p>
+                    </div>
+
+                    <div class="node-arrow" id="arrow2">↓</div>
+
+                    <div class="node router-node" id="node-router">
+                        <div class="node-header">
+                            <span class="node-icon">🚦</span>
+                            <span class="node-title">Router Decision</span>
+                        </div>
+                        <p class="node-description">Decide next action based on completeness</p>
+                        <div class="router-branches">
+                            <div class="branch" id="branch-ask">
+                                <div class="branch-label">Ask More →</div>
+                                <div style="font-size: 0.85rem; opacity: 0.8;">Generate question</div>
+                            </div>
+                            <div class="branch" id="branch-refine">
+                                <div class="branch-label">Complete →</div>
+                                <div style="font-size: 0.85rem; opacity: 0.8;">Generate summary</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="node-arrow" id="arrow3">↓</div>
+
+                    <div class="node" id="node-question" style="display: none;">
+                        <div class="node-header">
+                            <span class="node-icon">❓</span>
+                            <span class="node-title">Generate Question</span>
+                        </div>
+                        <p class="node-description">Ask for missing information</p>
+                    </div>
+
+                    <div class="node" id="node-compose" style="display: none;">
+                        <div class="node-header">
+                            <span class="node-icon">📝</span>
+                            <span class="node-title">Compose Summary</span>
+                        </div>
+                        <p class="node-description">Create structured project summary</p>
+                    </div>
+
+                    <div class="node-arrow" id="arrow4" style="display: none;">↓</div>
+
+                    <div class="node" id="node-refine" style="display: none;">
+                        <div class="node-header">
+                            <span class="node-icon">✨</span>
+                            <span class="node-title">Refine Summary</span>
+                        </div>
+                        <p class="node-description">Polish into research-style prose</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="extracted-data">
+            <div class="data-header">📊 Extracted Project Data</div>
+            <div class="data-grid">
+                <div class="data-item" id="data-problem">
+                    <div class="data-label">Problem Statement</div>
+                    <div class="data-value">Not yet extracted</div>
+                </div>
+                <div class="data-item" id="data-domain">
+                    <div class="data-label">Domain</div>
+                    <div class="data-value">Not yet extracted</div>
+                </div>
+                <div class="data-item" id="data-goals">
+                    <div class="data-label">Goals</div>
+                    <div class="data-value">Not yet extracted</div>
+                </div>
+                <div class="data-item" id="data-topics">
+                    <div class="data-label">Key Topics</div>
+                    <div class="data-value">Not yet extracted</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="completion-banner" id="completionBanner">
+            <div class="completion-icon">🎉</div>
+            <div class="completion-title">Project Summary Complete!</div>
+            <p>All required information has been gathered and structured. Ready for roadmap and feasibility analysis.</p>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const conversation = [
+            { sender: 'user', text: 'I want to build an AI-powered healthcare diagnostic system' },
+            { sender: 'ai', text: 'Great! Can you tell me more about the specific medical domain and the technologies you\'re considering?' },
+            { sender: 'user', text: 'It will use computer vision for X-ray analysis in radiology. We\'re planning to use deep learning.' },
+            { sender: 'ai', text: 'Excellent! What are your main goals for this project?' },
+            { sender: 'user', text: 'We want to improve diagnostic accuracy, reduce radiologist workload, and provide faster results to patients.' }
+        ];
+
+        const steps = [
+            { action: 'message', index: 0, duration: 1500 },
+            { action: 'typing', duration: 1000 },
+            { action: 'node', id: 'node-extract', duration: 2000 },
+            { action: 'arrow', id: 'arrow1', duration: 500 },
+            { action: 'node', id: 'node-missing', duration: 1500 },
+            { action: 'arrow', id: 'arrow2', duration: 500 },
+            { action: 'node', id: 'node-router', duration: 1500 },
+            { action: 'branch', id: 'branch-ask', duration: 1000 },
+            { action: 'arrow', id: 'arrow3', duration: 500 },
+            { action: 'showNode', id: 'node-question', duration: 500 },
+            { action: 'node', id: 'node-question', duration: 2000 },
+            { action: 'message', index: 1, duration: 1500 },
+            
+            { action: 'message', index: 2, duration: 1500 },
+            { action: 'typing', duration: 1000 },
+            { action: 'node', id: 'node-extract', duration: 2000 },
+            { action: 'data', field: 'problem', value: 'AI-powered healthcare diagnostic system for X-ray analysis', duration: 500 },
+            { action: 'data', field: 'domain', value: 'Computer Vision, Healthcare, Radiology', duration: 500 },
+            { action: 'arrow', id: 'arrow1', duration: 500 },
+            { action: 'node', id: 'node-missing', duration: 1500 },
+            { action: 'arrow', id: 'arrow2', duration: 500 },
+            { action: 'node', id: 'node-router', duration: 1500 },
+            { action: 'branch', id: 'branch-ask', duration: 1000 },
+            { action: 'arrow', id: 'arrow3', duration: 500 },
+            { action: 'node', id: 'node-question', duration: 2000 },
+            { action: 'message', index: 3, duration: 1500 },
+            
+            { action: 'message', index: 4, duration: 1500 },
+            { action: 'typing', duration: 1000 },
+            { action: 'node', id: 'node-extract', duration: 2000 },
+            { action: 'data', field: 'goals', value: 'Improve diagnostic accuracy, Reduce workload, Faster results', duration: 500 },
+            { action: 'data', field: 'topics', value: 'Deep Learning, Medical Imaging, Computer Vision', duration: 500 },
+            { action: 'arrow', id: 'arrow1', duration: 500 },
+            { action: 'node', id: 'node-missing', duration: 1500 },
+            { action: 'arrow', id: 'arrow2', duration: 500 },
+            { action: 'node', id: 'node-router', duration: 1500 },
+            { action: 'branch', id: 'branch-refine', duration: 1000 },
+            { action: 'arrow', id: 'arrow3', duration: 500 },
+            { action: 'hideNode', id: 'node-question', duration: 200 },
+            { action: 'showNode', id: 'node-compose', duration: 500 },
+            { action: 'node', id: 'node-compose', duration: 2500 },
+            { action: 'showArrow', id: 'arrow4', duration: 500 },
+            { action: 'arrow', id: 'arrow4', duration: 500 },
+            { action: 'showNode', id: 'node-refine', duration: 500 },
+            { action: 'node', id: 'node-refine', duration: 2500 },
+            { action: 'complete', duration: 1500 }
+        ];
+
+        function addMessage(sender, text) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.innerHTML = `
+                <div class="message-header">${sender === 'user' ? 'You' : 'AI Assistant'}</div>
+                <div>${text}</div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTyping() {
+            document.getElementById('typingIndicator').classList.add('visible');
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').classList.remove('visible');
+        }
+
+        function activateNode(nodeId) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('active'));
+            const node = document.getElementById(nodeId);
+            if (node) {
+                node.classList.add('active');
+                setTimeout(() => {
+                    node.classList.add('completed');
+                    node.classList.remove('active');
+                }, 1500);
+            }
+        }
+
+        function activateArrow(arrowId) {
+            const arrow = document.getElementById(arrowId);
+            if (arrow) {
+                arrow.classList.add('active');
+                setTimeout(() => arrow.classList.remove('active'), 1000);
+            }
+        }
+
+        function activateBranch(branchId) {
+            document.querySelectorAll('.branch').forEach(b => b.classList.remove('active'));
+            const branch = document.getElementById(branchId);
+            if (branch) {
+                branch.classList.add('active');
+                setTimeout(() => branch.classList.remove('active'), 1500);
+            }
+        }
+
+        function showNode(nodeId) {
+            const node = document.getElementById(nodeId);
+            if (node) node.style.display = 'block';
+        }
+
+        function hideNode(nodeId) {
+            const node = document.getElementById(nodeId);
+            if (node) node.style.display = 'none';
+        }
+
+        function updateData(field, value) {
+            const dataItem = document.getElementById(`data-${field}`);
+            if (dataItem) {
+                dataItem.classList.add('visible');
+                dataItem.querySelector('.data-value').textContent = value;
+            }
+        }
+
+        function showCompletion() {
+            document.getElementById('completionBanner').classList.add('visible');
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            switch (step.action) {
+                case 'message':
+                    hideTyping();
+                    addMessage(conversation[step.index].sender, conversation[step.index].text);
+                    break;
+                case 'typing':
+                    showTyping();
+                    break;
+                case 'node':
+                    activateNode(step.id);
+                    break;
+                case 'arrow':
+                    activateArrow(step.id);
+                    break;
+                case 'branch':
+                    activateBranch(step.id);
+                    break;
+                case 'showNode':
+                    showNode(step.id);
+                    break;
+                case 'hideNode':
+                    hideNode(step.id);
+                    break;
+                case 'showArrow':
+                    const arrow = document.getElementById(step.id);
+                    if (arrow) arrow.style.display = 'block';
+                    break;
+                case 'data':
+                    updateData(step.field, step.value);
+                    break;
+                case 'complete':
+                    showCompletion();
+                    break;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.innerHTML = `
+                <div class="message ai">
+                    <div class="message-header">AI Assistant</div>
+                    <div>Hello! I'm here to help you define your research project. What problem are you trying to solve?</div>
+                </div>
+            `;
+            
+            hideTyping();
+            
+            document.querySelectorAll('.node').forEach(n => {
+                n.classList.remove('active', 'completed');
+            });
+            
+            document.querySelectorAll('.branch').forEach(b => {
+                b.classList.remove('active');
+            });
+            
+            document.getElementById('node-question').style.display = 'none';
+            document.getElementById('node-compose').style.display = 'none';
+            document.getElementById('node-refine').style.display = 'none';
+            document.getElementById('arrow4').style.display = 'none';
+            
+            document.querySelectorAll('.data-item').forEach(d => {
+                d.classList.remove('visible');
+                d.querySelector('.data-value').textContent = 'Not yet extracted';
+            });
+            
+            document.getElementById('completionBanner').classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>

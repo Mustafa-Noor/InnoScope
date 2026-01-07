@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Summarization Pipeline Animation</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .back-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .back-btn:hover {
+            background: white;
+            color: #fa709a;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid white;
+            border-radius: 25px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: white;
+            color: #fa709a;
+            transform: scale(1.05);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .pipeline-container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 40px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #fa709a, #fee140);
+            width: 0%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+            font-weight: bold;
+        }
+
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            gap: 20px;
+        }
+
+        .step {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            border: 3px solid transparent;
+            transition: all 0.5s ease;
+            position: relative;
+        }
+
+        .step.active {
+            border-color: #10b981;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+            transform: scale(1.05);
+        }
+
+        .step.completed {
+            border-color: #059669;
+            opacity: 0.7;
+        }
+
+        .step-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .step-number {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #fee140;
+            margin-bottom: 10px;
+        }
+
+        .step-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .step-description {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .arrow {
+            font-size: 3rem;
+            opacity: 0.3;
+            transition: all 0.5s ease;
+        }
+
+        .arrow.active {
+            opacity: 1;
+            animation: slideRight 1s ease-in-out infinite;
+        }
+
+        @keyframes slideRight {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            50% {
+                transform: translateX(10px);
+            }
+        }
+
+        .data-visualization {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .data-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            display: none;
+        }
+
+        .data-box.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .data-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .data-icon {
+            font-size: 2rem;
+        }
+
+        .data-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+        }
+
+        .data-content {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            line-height: 1.8;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .data-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .data-content::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .data-content::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 4px;
+        }
+
+        .field-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+
+        .field-label {
+            font-weight: bold;
+            color: #fee140;
+            margin-bottom: 5px;
+        }
+
+        .field-value {
+            opacity: 0.9;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #fee140;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .completion-banner {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            margin-top: 40px;
+            display: none;
+        }
+
+        .completion-banner.visible {
+            display: block;
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        .completion-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .completion-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 968px) {
+            .flow-diagram {
+                flex-direction: column;
+            }
+            
+            .arrow {
+                transform: rotate(90deg);
+            }
+            
+            .data-visualization {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="index.html" class="back-btn">← Back</a>
+    
+    <div class="container">
+        <div class="header">
+            <h1>📝 Summarization Pipeline Animation</h1>
+            <p>Transform research papers into concise, structured summaries</p>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="startBtn">▶️ Start Animation</button>
+            <button class="btn" id="pauseBtn" disabled>⏸️ Pause</button>
+            <button class="btn" id="resetBtn">🔄 Reset</button>
+        </div>
+
+        <div class="pipeline-container">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar">0%</div>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="step" id="step1">
+                    <span class="step-icon">📄</span>
+                    <div class="step-number">Step 1</div>
+                    <div class="step-title">Extract Text</div>
+                    <p class="step-description">Read and extract content from PDF or DOCX document</p>
+                </div>
+
+                <span class="arrow" id="arrow1">→</span>
+
+                <div class="step" id="step2">
+                    <span class="step-icon">🧹</span>
+                    <div class="step-number">Step 2</div>
+                    <div class="step-title">Cleanup</div>
+                    <p class="step-description">Remove formatting artifacts and prepare text for analysis</p>
+                </div>
+
+                <span class="arrow" id="arrow2">→</span>
+
+                <div class="step" id="step3">
+                    <span class="step-icon">✨</span>
+                    <div class="step-number">Step 3</div>
+                    <div class="step-title">Summarize</div>
+                    <p class="step-description">AI-powered summarization with field extraction</p>
+                </div>
+            </div>
+
+            <div class="data-visualization">
+                <div class="data-box" id="rawTextBox">
+                    <div class="data-header">
+                        <span class="data-icon">📄</span>
+                        <span class="data-title">Raw Extracted Text</span>
+                    </div>
+                    <div class="data-content">
+                        <p>
+                            <strong>Title:</strong> Deep Learning Approaches for Medical Image Analysis in Radiology
+                        </p>
+                        <p style="margin-top: 15px;">
+                            <strong>Abstract:</strong> This paper presents a comprehensive study of deep learning methodologies 
+                            applied to medical imaging, specifically focusing on X-ray analysis in radiology departments. 
+                            We propose a novel convolutional neural network architecture that achieves state-of-the-art performance 
+                            in detecting pulmonary abnormalities with 95.3% accuracy.
+                        </p>
+                        <p style="margin-top: 15px;">
+                            The research demonstrates significant improvements in diagnostic accuracy while reducing the time 
+                            required for radiological assessment. Our system processes chest X-rays 10x faster than traditional 
+                            methods while maintaining superior sensitivity and specificity metrics...
+                        </p>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value">15,420</span>
+                            <span class="stat-label">Characters</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">2,850</span>
+                            <span class="stat-label">Words</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">12</span>
+                            <span class="stat-label">Pages</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="data-box" id="summaryBox">
+                    <div class="data-header">
+                        <span class="data-icon">📝</span>
+                        <span class="data-title">Generated Summary</span>
+                    </div>
+                    <div class="data-content">
+                        <p style="margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.2);">
+                            <strong>Summary:</strong><br>
+                            This research introduces an advanced deep learning system for automated medical image analysis in 
+                            radiology, achieving 95.3% accuracy in detecting pulmonary abnormalities from chest X-rays. 
+                            The system significantly reduces diagnostic time while improving accuracy.
+                        </p>
+                        
+                        <div class="field-item">
+                            <div class="field-label">Problem Statement</div>
+                            <div class="field-value">
+                                Manual X-ray analysis is time-consuming and prone to human error, requiring automated 
+                                AI-assisted diagnostic tools
+                            </div>
+                        </div>
+                        
+                        <div class="field-item">
+                            <div class="field-label">Domain</div>
+                            <div class="field-value">Medical Imaging, Computer Vision, Healthcare AI</div>
+                        </div>
+                        
+                        <div class="field-item">
+                            <div class="field-label">Goals</div>
+                            <div class="field-value">
+                                • Achieve >95% diagnostic accuracy<br>
+                                • Reduce analysis time by 10x<br>
+                                • Support radiologists with AI assistance
+                            </div>
+                        </div>
+                        
+                        <div class="field-item">
+                            <div class="field-label">Key Topics</div>
+                            <div class="field-value">
+                                Deep Learning, CNNs, Medical Imaging, X-ray Analysis, Computer-Aided Diagnosis
+                            </div>
+                        </div>
+                        
+                        <div class="field-item">
+                            <div class="field-label">Prerequisites</div>
+                            <div class="field-value">
+                                TensorFlow/PyTorch, Large X-ray dataset, GPU infrastructure, Medical domain expertise
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="completion-banner" id="completionBanner">
+                <div class="completion-icon">🎉</div>
+                <div class="completion-title">Summarization Complete!</div>
+                <p>Research paper has been successfully processed and summarized with extracted fields</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let isPaused = false;
+        let currentStep = 0;
+
+        const steps = [
+            { progress: 10, message: 'Loading document...', duration: 1000 },
+            { progress: 20, step: 1, message: 'Extracting text from PDF...', duration: 2000 },
+            { progress: 40, step: 1, complete: true, arrow: 'arrow1', showBox: 'rawTextBox', duration: 1500 },
+            { progress: 50, step: 2, message: 'Cleaning and preprocessing text...', duration: 1500 },
+            { progress: 60, step: 2, complete: true, arrow: 'arrow2', duration: 1000 },
+            { progress: 70, step: 3, message: 'Running AI summarization...', duration: 2500 },
+            { progress: 85, step: 3, message: 'Extracting structured fields...', duration: 2000 },
+            { progress: 95, step: 3, complete: true, showBox: 'summaryBox', duration: 1500 },
+            { progress: 100, showCompletion: true, duration: 1500 }
+        ];
+
+        function updateProgress(percent) {
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = percent + '%';
+            progressBar.textContent = percent + '%';
+        }
+
+        function activateStep(stepNum) {
+            document.querySelectorAll('.step').forEach(s => {
+                s.classList.remove('active');
+            });
+            if (stepNum) {
+                const step = document.getElementById('step' + stepNum);
+                step.classList.add('active');
+            }
+        }
+
+        function completeStep(stepNum) {
+            const step = document.getElementById('step' + stepNum);
+            step.classList.add('completed');
+            step.classList.remove('active');
+        }
+
+        function activateArrow(arrowId) {
+            document.querySelectorAll('.arrow').forEach(a => {
+                a.classList.remove('active');
+            });
+            if (arrowId) {
+                const arrow = document.getElementById(arrowId);
+                arrow.classList.add('active');
+            }
+        }
+
+        function showBox(boxId) {
+            if (boxId) {
+                const box = document.getElementById(boxId);
+                box.classList.add('visible');
+            }
+        }
+
+        function showCompletion() {
+            document.getElementById('completionBanner').classList.add('visible');
+        }
+
+        async function runStep(step) {
+            if (!isRunning || isPaused) return;
+
+            updateProgress(step.progress);
+
+            if (step.step) {
+                activateStep(step.step);
+            }
+
+            if (step.complete) {
+                completeStep(step.step);
+            }
+
+            if (step.arrow) {
+                activateArrow(step.arrow);
+            }
+
+            if (step.showBox) {
+                showBox(step.showBox);
+            }
+
+            if (step.showCompletion) {
+                showCompletion();
+            }
+
+            await new Promise(resolve => setTimeout(resolve, step.duration));
+
+            currentStep++;
+            if (currentStep < steps.length && isRunning) {
+                await runStep(steps[currentStep]);
+            } else {
+                isRunning = false;
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('pauseBtn').disabled = true;
+            }
+        }
+
+        document.getElementById('startBtn').addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                isPaused = false;
+                document.getElementById('startBtn').disabled = true;
+                document.getElementById('pauseBtn').disabled = false;
+                runStep(steps[currentStep]);
+            }
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            isPaused = !isPaused;
+            document.getElementById('pauseBtn').textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isRunning = false;
+            isPaused = false;
+            currentStep = 0;
+            
+            updateProgress(0);
+            
+            document.querySelectorAll('.step').forEach(s => {
+                s.classList.remove('active', 'completed');
+            });
+            
+            document.querySelectorAll('.arrow').forEach(a => {
+                a.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.data-box').forEach(b => {
+                b.classList.remove('visible');
+            });
+            
+            document.getElementById('completionBanner').classList.remove('visible');
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('pauseBtn').disabled = true;
+            document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+        });
+    </script>
+</body>
+</html>
